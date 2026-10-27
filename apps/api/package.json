@@ -1,0 +1,31 @@
+{
+  "name": "@open-relief/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
+    "start": "node dist/server.js",
+    "worker": "node dist/worker.js",
+    "test": "pnpm build && node --experimental-strip-types --test test/e2e.test.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.900.0",
+    "@aws-sdk/client-textract": "^3.900.0",
+    "@aws-sdk/s3-presigned-post": "^3.900.0",
+    "@open-relief/db": "workspace:*",
+    "@open-relief/shared": "workspace:*",
+    "bullmq": "^5.61.0",
+    "drizzle-orm": "^0.44.7",
+    "fastify": "^5.6.1",
+    "file-type": "^21.0.0",
+    "ioredis": "^5.8.2",
+    "pg": "^8.16.3",
+    "sharp": "^0.34.4",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "s3rver": "^3.7.1"
+  }
+}

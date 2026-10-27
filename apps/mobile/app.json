@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "open-relief",
+    "slug": "open-relief",
+    "scheme": "openrelief",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "plugins": ["expo-image-picker", "expo-document-picker"],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "org.openrelief.app"
+    }
+  }
+}

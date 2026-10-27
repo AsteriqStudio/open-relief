@@ -4,6 +4,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { jwtVerify, SignJWT } from 'jose';
 import { z } from 'zod';
 import { authSessions, users } from '@open-relief/db';
+import { AssistanceProgramSchema } from '@open-relief/shared';
 import type { Database } from './services.js';
 
 const SESSION_DAYS = 7;
@@ -14,7 +15,11 @@ const SignUpSchema = z.object({
   password: PasswordSchema,
   phone: z.string().min(7).max(30),
   role: z.enum(['recipient', 'donor']),
-}).strict();
+  legalName: z.string().trim().min(2).max(120).optional(),
+  assistanceProgram: AssistanceProgramSchema.default('NONE'),
+}).strict().superRefine((input, context) => {
+  if (input.role === 'recipient' && !input.legalName) context.addIssue({ code: 'custom', path: ['legalName'], message: 'Recipient legal name is required to match the bill' });
+});
 const SignInSchema = z.object({ email: EmailSchema, password: z.string().min(1) }).strict();
 const TOKEN_PATTERN = /^Bearer ([A-Za-z0-9._-]{64,4096})$/;
 
@@ -101,7 +106,7 @@ export function registerAuth(app: FastifyInstance, db: Database, secretHex: stri
     if (existing) return reply.code(409).send({ error: 'Email already registered' });
     const user: AuthUser = { id: randomUUID(), role: input.role, email: input.email };
     try {
-      await db.insert(users).values({ ...user, phone: input.phone, passwordHash: await hashPassword(input.password) });
+      await db.insert(users).values({ ...user, phone: input.phone, legalName: input.legalName ?? null, assistanceProgram: input.assistanceProgram, passwordHash: await hashPassword(input.password) });
     } catch (error) {
       if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') return reply.code(409).send({ error: 'Email already registered' });
       throw error;

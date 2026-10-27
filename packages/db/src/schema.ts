@@ -1,9 +1,10 @@
-import { check, date, index, integer, jsonb, pgEnum, pgTable, real, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { boolean, check, date, index, integer, jsonb, pgEnum, pgTable, real, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 export const userRole = pgEnum('user_role', ['recipient', 'donor', 'admin']);
 export const billCategory = pgEnum('bill_category', ['electric', 'water', 'gas', 'medical']);
-export const billStatus = pgEnum('bill_status', ['pending_ocr', 'verified', 'funded', 'settled', 'rejected']);
+export const billStatus = pgEnum('bill_status', ['pending_ocr', 'pending_review', 'verified', 'funded', 'settled', 'rejected']);
+export const assistanceProgram = pgEnum('assistance_program', ['SNAP', 'MEDICAID', 'LIHEAP', 'NONE']);
 export const transactionStatus = pgEnum('transaction_status', ['pending', 'succeeded', 'failed']);
 
 export const users = pgTable('users', {
@@ -12,8 +13,12 @@ export const users = pgTable('users', {
   email: text('email').notNull(),
   phone: text('phone').notNull(),
   passwordHash: text('password_hash'),
+  legalName: text('legal_name'),
+  lifetimeAidCents: integer('lifetime_aid_cents').default(0).notNull(),
+  lastAidAt: timestamp('last_aid_at', { withTimezone: true }),
+  assistanceProgram: assistanceProgram('assistance_program').default('NONE').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-}, (table) => [uniqueIndex('users_email_unique').on(table.email)]);
+}, (table) => [uniqueIndex('users_email_unique').on(table.email), check('users_lifetime_aid_check', sql`${table.lifetimeAidCents} >= 0`) ]);
 
 export const authSessions = pgTable('auth_sessions', {
   tokenHash: text('token_hash').primaryKey(),
@@ -27,6 +32,10 @@ export const bills = pgTable('bills', {
   id: uuid('id').primaryKey(),
   recipientId: uuid('recipient_id').notNull().references(() => users.id),
   billerName: text('biller_name'),
+  accountHolderName: text('account_holder_name'),
+  isShutoffNotice: boolean('is_shutoff_notice').default(false).notNull(),
+  daysUntilDisconnection: integer('days_until_disconnection'),
+  rejectionReason: text('rejection_reason'),
   billerMerchantId: text('biller_merchant_id'),
   billerAccountEncrypted: text('biller_account_encrypted'),
   accountHash: text('account_hash'),

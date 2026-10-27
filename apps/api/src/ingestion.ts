@@ -1,12 +1,13 @@
 import { GetObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { createHash, randomUUID } from 'node:crypto';
-import { and, eq, gt, ne, sql } from 'drizzle-orm';
+import { and, eq, gt, gte, inArray, lt, ne, sql, sum } from 'drizzle-orm';
 import { fileTypeFromBuffer } from 'file-type';
 import sharp from 'sharp';
-import { auditLogs, bills } from '@open-relief/db';
+import { auditLogs, bills, transactions, users } from '@open-relief/db';
 import { encryptAccountNumber } from '@open-relief/db/security/encryption';
 import type { IOCRExtractor } from './ocr.js';
 import type { Services } from './services.js';
+import { assessBillEligibility } from './services/vettingService.js';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const MIME_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
@@ -34,16 +35,42 @@ export async function processUploadedBill(billId: string, services: Services, ex
   const fingerprint = createHash('sha256').update(`${result.billerName.trim().toLowerCase()}|${accountHash}|${result.dueDate}`).digest('hex');
   await services.db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${fingerprint}))`);
+    const [recipient] = await tx.select().from(users).where(eq(users.id, bill.recipientId)).for('update');
+    if (!recipient) throw new Error('Bill recipient no longer exists');
+    const now = new Date();
+    const yearStart = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
+    const nextYearStart = new Date(Date.UTC(now.getUTCFullYear() + 1, 0, 1));
+    const [aid] = await tx.select({ total: sum(transactions.amountToBillCents) }).from(transactions)
+      .innerJoin(bills, eq(transactions.billId, bills.id))
+      .where(and(eq(bills.recipientId, recipient.id), eq(transactions.status, 'succeeded'), gte(transactions.updatedAt, yearStart), lt(transactions.updatedAt, nextYearStart)));
+    const [activeBills] = await tx.select({ total: sum(bills.remainingBalanceCents) }).from(bills)
+      .where(and(eq(bills.recipientId, recipient.id), inArray(bills.status, ['verified', 'funded'])));
     const [duplicate] = await tx.select({ id: bills.id }).from(bills).where(and(
       eq(bills.duplicateFingerprint, fingerprint),
       ne(bills.id, billId),
       gt(bills.createdAt, new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)),
       ne(bills.status, 'rejected'),
     )).limit(1);
-    const needsReview = result.confidence < 85 || !result.merchantId;
-    const nextStatus = duplicate ? 'rejected' : needsReview ? 'pending_ocr' : 'verified';
+    const vetting = assessBillEligibility({
+      legalName: recipient.legalName,
+      accountHolderName: result.accountHolderName,
+      noticeText: result.noticeText,
+      statementBalanceCents: result.statementBalanceCents,
+      lifetimeAidCents: recipient.lifetimeAidCents,
+      currentYearAidCents: Number(aid?.total ?? 0),
+      activeBillCommitmentsCents: Number(activeBills?.total ?? 0),
+      lastAidAt: recipient.lastAidAt,
+      now,
+    });
+    const needsOcrReview = result.confidence < 85 || !result.merchantId;
+    const nextStatus = duplicate ? 'rejected' : vetting.outcome === 'rejected' ? 'rejected' : needsOcrReview || vetting.outcome === 'pending_review' ? 'pending_review' : 'verified';
+    const rejectionReason = duplicate ? 'This bill appears to duplicate a recent submission.' : vetting.reason ?? (needsOcrReview ? 'The creditor or document needs manual review.' : null);
     await tx.update(bills).set({
       billerName: result.billerName,
+      accountHolderName: result.accountHolderName,
+      isShutoffNotice: vetting.isShutoffNotice,
+      daysUntilDisconnection: vetting.daysUntilDisconnection,
+      rejectionReason,
       billerMerchantId: result.merchantId,
       billerAccountEncrypted: encryptAccountNumber(result.accountNumber),
       accountHash,
@@ -60,9 +87,9 @@ export async function processUploadedBill(billId: string, services: Services, ex
       updatedAt: new Date(),
     }).where(eq(bills.id, billId));
     await tx.insert(auditLogs).values({
-      id: randomUUID(), eventType: duplicate ? 'bill.duplicate_rejected' : needsReview ? 'bill.manual_review' : 'bill.verified',
+      id: randomUUID(), eventType: duplicate ? 'bill.duplicate_rejected' : nextStatus === 'rejected' ? 'bill.eligibility_rejected' : nextStatus === 'pending_review' ? 'bill.manual_review' : 'bill.verified',
       billId,
-      metadata: { confidence: result.confidence },
+      metadata: { confidence: result.confidence, vettingOutcome: vetting.outcome, nameSimilarity: vetting.nameSimilarity },
     });
   });
 }

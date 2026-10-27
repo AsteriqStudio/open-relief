@@ -16,18 +16,20 @@ const response: AnalyzeDocumentCommandOutput = {
     ...answer('TOTAL_AMOUNT_DUE', '$123.45', 94),
     ...answer('DUE_DATE', '11/30/2026', 90),
     ...answer('BILLER_NAME', 'Demo Electric', 88),
+    ...answer('ACCOUNT_HOLDER_NAME', 'Demo Recipient', 91),
+    { Id: 'line-notice', BlockType: 'LINE', Text: 'FINAL NOTICE: past due' },
   ],
 };
 
 test('Textract query answers normalize to parsed bill data', () => {
   assert.deepEqual(parseTextractDocument(response), {
     billerName: 'Demo Electric', accountNumber: 'ACCT-1001', dueDate: '2026-11-30',
-    statementBalanceCents: 12_345, confidence: 88, merchantId: null,
+    statementBalanceCents: 12_345, confidence: 88, merchantId: null, accountHolderName: 'Demo Recipient', noticeText: 'FINAL NOTICE: past due',
   });
   assert.throws(() => parseTextractDocument({ $metadata: {}, Blocks: response.Blocks?.slice(2) }), /ACCOUNT_NUMBER/);
 });
 
-test('adapter factory defaults to mock and Textract calls AnalyzeDocument with four queries', async () => {
+test('adapter factory defaults to mock and Textract calls AnalyzeDocument with five queries', async () => {
   assert.ok(createOCRExtractor('mock', 'us-east-1') instanceof MockOCRExtractor);
   assert.ok(createOCRExtractor('textract', 'us-east-1') instanceof AWSTextractExtractor);
   let called = false;
@@ -36,7 +38,7 @@ test('adapter factory defaults to mock and Textract calls AnalyzeDocument with f
     assert.ok(command instanceof AnalyzeDocumentCommand);
     assert.deepEqual(command.input.FeatureTypes, ['QUERIES', 'TABLES']);
     assert.deepEqual(command.input.QueriesConfig?.Queries?.map((query) => query.Text), [
-      'What is the account number?', 'What is the total amount due?', 'What is the due date?', 'What is the utility or biller name?',
+      'What is the account number?', 'What is the total amount due?', 'What is the due date?', 'What is the utility or biller name?', 'What is the account holder name?',
     ]);
     return response;
   } } as unknown as TextractClient;

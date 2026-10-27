@@ -11,6 +11,9 @@ const BillSchema = z.object({
   statementBalanceCents: z.number().int().nullable(),
   remainingBalanceCents: z.number().int().nullable(),
   status: z.enum(['verified', 'funded']),
+  isShutoffNotice: z.boolean(),
+  daysUntilDisconnection: z.number().int().nullable(),
+  accountLast4: z.string().nullable(),
 });
 
 export type FeedBill = z.infer<typeof BillSchema>;
@@ -40,7 +43,7 @@ async function request(path: string, init?: RequestInit, token?: string): Promis
   return body;
 }
 
-export async function signUp(input: { email: string; password: string; phone: string; role: 'recipient' | 'donor' }): Promise<AuthSession> {
+export async function signUp(input: { email: string; password: string; phone: string; role: 'recipient' | 'donor'; legalName?: string; assistanceProgram?: 'SNAP' | 'MEDICAID' | 'LIHEAP' | 'NONE' }): Promise<AuthSession> {
   return SessionSchema.parse(await request('/api/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
 }
 
@@ -87,8 +90,13 @@ export async function uploadBill(input: {
   return details.billId;
 }
 
-export async function getBillStatus(id: string, token: string): Promise<'pending_ocr' | 'verified' | 'funded' | 'settled' | 'rejected'> {
-  return z.object({ status: z.enum(['pending_ocr', 'verified', 'funded', 'settled', 'rejected']) }).parse(await request(`/api/bills/${id}`, undefined, token)).status;
+const BillDetailsSchema = z.object({ status: z.enum(['pending_ocr', 'pending_review', 'verified', 'funded', 'settled', 'rejected']), rejectionReason: z.string().nullable() });
+export async function getBillDetails(id: string, token: string): Promise<z.infer<typeof BillDetailsSchema>> {
+  return BillDetailsSchema.parse(await request(`/api/bills/${id}`, undefined, token));
+}
+
+export async function getBillStatus(id: string, token: string): Promise<z.infer<typeof BillDetailsSchema>['status']> {
+  return (await getBillDetails(id, token)).status;
 }
 
 export async function createDonationIntent(input: {
@@ -106,4 +114,20 @@ export async function createDonationIntent(input: {
 
 export async function completeMockDonation(transactionId: string, token: string): Promise<void> {
   await request(`/api/demo/donations/${transactionId}/complete`, { method: 'POST' }, token);
+}
+
+const DonationReceiptSchema = z.object({
+  id: z.string().uuid(),
+  billerName: z.string().nullable(),
+  accountLast4: z.string().nullable(),
+  amountToBillCents: z.number().int(),
+  totalChargeCents: z.number().int(),
+  methodDisbursementId: z.string().nullable(),
+  taxNotice: z.string(),
+  createdAt: z.string().datetime(),
+});
+export type DonationReceipt = z.infer<typeof DonationReceiptSchema>;
+
+export async function getDonationReceipt(transactionId: string, token: string): Promise<DonationReceipt> {
+  return DonationReceiptSchema.parse(await request(`/api/donations/${transactionId}/receipt`, undefined, token));
 }

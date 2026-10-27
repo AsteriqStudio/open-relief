@@ -37,7 +37,7 @@ pnpm test
 EXPO_NO_TELEMETRY=1 EXPO_OFFLINE=1 pnpm --filter @open-relief/mobile export
 ```
 
-The end-to-end test uploads a JPEG through the presigned form, checks EXIF removal, waits for mock OCR, rejects a duplicate, creates a mock donation, verifies the webhook signature and replay handling, and confirms the bill is settled. Adapter tests exercise signed Stripe test webhook fixtures, partial and full settlement, fee splits, and Method sandbox routing without external credentials. Tests create uniquely identified demo data on each run.
+The end-to-end test uploads a JPEG through the presigned form, checks EXIF removal, waits for mock OCR, rejects a duplicate, creates a mock donation, verifies the webhook signature and replay handling, and confirms the bill is settled. Adapter tests exercise signed Stripe test webhook fixtures, partial and full settlement, fee splits, and Method sandbox routing without external credentials. Vetting tests check urgency, annual aid exposure, cooldown, name matching, rejection, and manual review. Tests create uniquely identified demo data on each run.
 
 ## Stripe test checkout and Method simulation
 
@@ -47,14 +47,20 @@ The backend computes the existing fee split before creating a test intent. Webho
 
 ## Authentication and OCR modes
 
-`POST /api/auth/signup` accepts an email, password of at least 12 characters, phone, and `recipient` or `donor` role. `POST /api/auth/signin` returns a signed JWT session token; clients send it as `Authorization: Bearer <token>`. The server stores only a hash of the token's random session ID for revocation and enforces roles and ownership on bill uploads, donations, and receipts. The mobile app stores the token with Expo SecureStore and supports sign out.
+`POST /api/auth/signup` accepts an email, password of at least 12 characters, phone, and `recipient` or `donor` role. Recipients also provide the legal name on the bill and may self-report an assistance program. `POST /api/auth/signin` returns a signed JWT session token; clients send it as `Authorization: Bearer <token>`. The server stores only a hash of the token's random session ID for revocation and enforces roles and ownership on bill uploads, donations, and receipts. The mobile app stores the token with Expo SecureStore and supports sign out.
 
-The OCR worker defaults to `OCR_PROVIDER=mock`. Set `OCR_PROVIDER=textract` and `AWS_REGION` when AWS credentials are available through the standard SDK credential chain. The Textract adapter calls `AnalyzeDocument` with account number, amount, due date, and biller name queries. Its extracted bill remains pending manual review until a creditor routing ID is independently verified; extraction alone never authorizes payment.
+The OCR worker defaults to `OCR_PROVIDER=mock`. Set `OCR_PROVIDER=textract` and `AWS_REGION` when AWS credentials are available through the standard SDK credential chain. The Textract adapter calls `AnalyzeDocument` with account number, amount, due date, biller name, and account holder queries; it also reads notice text from detected lines. Its extracted bill remains pending manual review until a creditor routing ID is independently verified; extraction alone never authorizes payment.
+
+## Eligibility and donor experience
+
+Before a bill enters the feed, the vetting service checks for shut-off or past-due language, a $600 UTC calendar-year aid limit, a 60-day cooldown after aid, and at least 80% account-holder name similarity. The yearly limit counts successful creditor payments and remaining balances of active verified bills; `lifetime_aid_cents` retains the historical total. Non-urgent or over-limit submissions are rejected. Cooldown, name mismatch, low OCR confidence, or an unverified merchant require manual review and stay off the feed. Recipient status responses explain rejection or review; donors see only verified or funded bills and a masked creditor account suffix.
+
+The donor app has a spring-driven swipe deck with haptics, an urgency indicator, a direct-creditor checkout sheet with preset or custom amounts, an unchanged fee split, and a confirmation card. A test PaymentSheet success first shows payment acceptance; the creditor confirmation appears only after the signed webhook records settlement. The app can share the non-deductible payment confirmation.
 
 ## Boundaries
 
 - Stripe test mode can present PaymentSheet with test cards, but no real funds move. The Method adapter is a local sandbox simulation and cannot disburse money.
 - The mock OCR adapter recognizes only a demo biller. Textract extraction can produce a bill for manual review, but it cannot approve a live creditor or route money.
-- Authentication uses local password accounts and revocable database sessions. Email verification, password recovery, abuse throttling, and a protected admin review workflow are still required before public deployment. The API remains bound to loopback.
+- Authentication uses local password accounts and revocable database sessions. Names and assistance programs are self-reported, so the match is a review signal rather than proof of identity. Household linking, email verification, password recovery, abuse throttling, and a protected admin review workflow are still required before public deployment. The API remains bound to loopback.
 - Payment confirmations make no tax-deductibility claim. Direct bill payments are not automatically charitable contributions, and the project has no verified 501(c)(3) status. The generated email payload is a payment confirmation, not a charitable tax receipt.
 - A future live design needs verified creditor routing, payment-provider coordination, authentication, privacy and fraud controls, and legal review. A Stripe charge followed by a separate disbursement does not alone establish that the platform avoids custody or money-transmission obligations.

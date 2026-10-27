@@ -19,6 +19,7 @@ const demoMerchants = [
   { id: 'mock-electric-phoenix', name: 'Phoenix Electric demo', routingNumber: '100000004' },
   { id: 'mock-water-austin', name: 'Austin Water demo', routingNumber: '100000005' },
   { id: 'mock-electric-coned', name: 'ConEd demo', routingNumber: '100000006' },
+  { id: 'mock-demo-utility', name: 'Demo Utility', routingNumber: '100000007' },
 ] as const;
 
 /** Deterministic local simulation of Method's sandbox bill-pay contract. No HTTP or funds move. */

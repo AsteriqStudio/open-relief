@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { and, eq, isNull } from 'drizzle-orm';
 import { createDatabase, bills, users } from './index.js';
 import { encryptAccountNumber } from './security/encryption.js';
 
@@ -16,9 +17,10 @@ const samples = [
 const { db, pool } = createDatabase();
 try {
   await db.insert(users).values([
-    { id: recipientId, role: 'recipient', email: 'recipient@example.invalid', phone: '+15555550101' },
+    { id: recipientId, role: 'recipient', email: 'recipient@example.invalid', phone: '+15555550101', legalName: 'Demo Recipient' },
     { id: donorId, role: 'donor', email: 'donor@example.invalid', phone: '+15555550102' },
   ]).onConflictDoNothing();
+  await db.update(users).set({ legalName: 'Demo Recipient' }).where(and(eq(users.id, recipientId), isNull(users.legalName)));
 
   for (const sample of samples) {
     const accountHash = createHash('sha256').update(sample.account).digest('hex');
@@ -26,6 +28,9 @@ try {
       id: sample.id,
       recipientId,
       billerName: sample.billerName,
+      accountHolderName: 'Demo Recipient',
+      isShutoffNotice: true,
+      daysUntilDisconnection: 4,
       billerMerchantId: sample.merchantId,
       billerAccountEncrypted: encryptAccountNumber(sample.account),
       accountHash,
@@ -44,6 +49,8 @@ try {
       zipCode: sample.zipCode,
       story: sample.story,
     }).onConflictDoNothing();
+    await db.update(bills).set({ accountHolderName: 'Demo Recipient', isShutoffNotice: true, daysUntilDisconnection: 4 })
+      .where(and(eq(bills.id, sample.id), isNull(bills.accountHolderName)));
   }
   console.log('Seeded five demo bills and two demo users');
 } finally {

@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { bills, transactions } from '@open-relief/db';
+import { decryptAccountNumber } from '@open-relief/db/security/encryption';
 import type { registerAuth } from '../auth.js';
 import { createDonationIntent, settleMockPayment } from '../payments.js';
 import type { Services } from '../services.js';
@@ -55,12 +56,15 @@ export function registerDonationRoutes(app: FastifyInstance, services: Services,
       receiptEmailPayload: transactions.receiptEmailPayload,
       stripePaymentIntentId: transactions.stripePaymentIntentId,
       billerName: bills.billerName,
+      billerAccountEncrypted: bills.billerAccountEncrypted,
       createdAt: transactions.createdAt,
     }).from(transactions).innerJoin(bills, eq(transactions.billId, bills.id)).where(eq(transactions.id, id));
     if (!row || row.status !== 'succeeded') return reply.code(404).send({ error: 'Settled donation not found' });
     if (row.donorId !== request.user!.id && request.user!.role !== 'admin') return reply.code(403).send({ error: 'Receipt belongs to another donor' });
+    const { billerAccountEncrypted, ...receipt } = row;
     return {
-      ...row,
+      ...receipt,
+      accountLast4: billerAccountEncrypted ? decryptAccountNumber(billerAccountEncrypted).slice(-4) : null,
       mode: row.stripePaymentIntentId?.startsWith('pi_mock_') ? 'mock' : 'test',
       taxNotice: row.receiptEmailPayload?.taxNotice ?? 'This demo receipt does not establish a tax-deductible charitable contribution.',
     };

@@ -144,6 +144,9 @@ test('signed Stripe test events settle partial and full bills once through Metho
     assert.ok(rows.every((row) => row.status === 'succeeded' && row.methodDisbursementId?.startsWith('pmt_') && row.stripeChargeId?.startsWith('ch_')));
     assert.match(rows[0]!.receiptEmailPayload?.taxNotice ?? '', /not represented as a tax-deductible/);
     assert.equal((await services.db.select().from(auditLogs).where(eq(auditLogs.billId, billId))).length, 2);
+    const [recipient] = await services.db.select().from(users).where(eq(users.id, recipientId));
+    assert.equal(recipient?.lifetimeAidCents, 12_500);
+    assert.ok(recipient.lastAidAt);
   } finally {
     await app.close();
     await services.close();

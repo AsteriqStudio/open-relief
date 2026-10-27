@@ -5,6 +5,7 @@ import { desc, eq, inArray } from 'drizzle-orm';
 import Fastify from 'fastify';
 import { z, ZodError } from 'zod';
 import { bills } from '@open-relief/db';
+import { decryptAccountNumber } from '@open-relief/db/security/encryption';
 import { registerAuth } from './auth.js';
 import { registerDonationRoutes } from './routes/donations.js';
 import type { Services } from './services.js';
@@ -94,11 +95,11 @@ export function buildApp(services: Services) {
 
   app.get('/api/bills/:id', { preHandler: requireAuth() }, async (request, reply) => {
     const { id } = BillIdSchema.parse(request.params);
-    const [bill] = await services.db.select({ id: bills.id, recipientId: bills.recipientId, status: bills.status, remainingBalanceCents: bills.remainingBalanceCents }).from(bills).where(eq(bills.id, id));
-    if (!bill || ((bill.status === 'pending_ocr' || bill.status === 'rejected') && bill.recipientId !== request.user!.id && request.user!.role !== 'admin')) {
+    const [bill] = await services.db.select({ id: bills.id, recipientId: bills.recipientId, status: bills.status, remainingBalanceCents: bills.remainingBalanceCents, rejectionReason: bills.rejectionReason }).from(bills).where(eq(bills.id, id));
+    if (!bill || ((bill.status === 'pending_ocr' || bill.status === 'pending_review' || bill.status === 'rejected') && bill.recipientId !== request.user!.id && request.user!.role !== 'admin')) {
       return reply.code(404).send({ error: 'Bill not found' });
     }
-    return { id: bill.id, status: bill.status, remainingBalanceCents: bill.remainingBalanceCents };
+    return { id: bill.id, status: bill.status, remainingBalanceCents: bill.remainingBalanceCents, rejectionReason: bill.recipientId === request.user!.id || request.user!.role === 'admin' ? bill.rejectionReason : null };
   });
 
   app.get('/api/bills/feed', async () => {
@@ -111,8 +112,14 @@ export function buildApp(services: Services) {
       statementBalanceCents: bills.statementBalanceCents,
       remainingBalanceCents: bills.remainingBalanceCents,
       status: bills.status,
+      isShutoffNotice: bills.isShutoffNotice,
+      daysUntilDisconnection: bills.daysUntilDisconnection,
+      billerAccountEncrypted: bills.billerAccountEncrypted,
     }).from(bills).where(inArray(bills.status, ['verified', 'funded'])).orderBy(desc(bills.createdAt)).limit(50);
-    return { bills: rows };
+    return { bills: rows.map(({ billerAccountEncrypted, ...bill }) => ({
+      ...bill,
+      accountLast4: billerAccountEncrypted ? decryptAccountNumber(billerAccountEncrypted).slice(-4) : null,
+    })) };
   });
 
   registerDonationRoutes(app, services, requireAuth);

@@ -26,7 +26,7 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     await worker.waitUntilReady();
     const signUp = async (role: 'recipient' | 'donor') => {
       const email = `${role}-${randomUUID()}@example.invalid`;
-      const response = await app.inject({ method: 'POST', url: '/api/auth/signup', payload: { email, password: 'local test password 2026', phone: '+15555550123', role } });
+      const response = await app.inject({ method: 'POST', url: '/api/auth/signup', payload: { email, password: 'local test password 2026', phone: '+15555550123', role, ...(role === 'recipient' ? { legalName: 'Demo Recipient' } : {}) } });
       assert.equal(response.statusCode, 201, response.body);
       return response.json<{ token: string; user: { id: string; role: string; email: string } }>();
     };

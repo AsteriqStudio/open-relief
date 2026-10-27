@@ -10,7 +10,7 @@ type AuthContextValue = {
   user: AuthUser | null;
   token: string | null;
   signIn(input: { email: string; password: string }): Promise<void>;
-  signUp(input: { email: string; password: string; phone: string; role: 'recipient' | 'donor' }): Promise<void>;
+  signUp(input: { email: string; password: string; phone: string; role: 'recipient' | 'donor'; legalName?: string; assistanceProgram?: 'SNAP' | 'MEDICAID' | 'LIHEAP' | 'NONE' }): Promise<void>;
   signOut(): Promise<void>;
 };
 

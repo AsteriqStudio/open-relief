@@ -10,6 +10,8 @@ export const ParsedBillDataSchema = z.object({
   statementBalanceCents: z.number().int().positive().max(2_147_483_647),
   confidence: z.number().min(0).max(100),
   merchantId: z.string().min(1).nullable(),
+  accountHolderName: z.string().min(1).nullable(),
+  noticeText: z.string(),
 }).strict();
 
 export type ParsedBillData = z.infer<typeof ParsedBillDataSchema>;
@@ -29,6 +31,8 @@ export class MockOCRExtractor implements IOCRExtractor {
       statementBalanceCents: 12_000,
       confidence: 96,
       merchantId: 'mock-demo-utility',
+      accountHolderName: 'Demo Recipient',
+      noticeText: 'FINAL NOTICE: Account is past due. Disconnection in 4 days.',
     });
   }
 }
@@ -48,6 +52,7 @@ const TEXTRACT_QUERIES = [
   { Text: 'What is the total amount due?', Alias: 'TOTAL_AMOUNT_DUE' },
   { Text: 'What is the due date?', Alias: 'DUE_DATE' },
   { Text: 'What is the utility or biller name?', Alias: 'BILLER_NAME' },
+  { Text: 'What is the account holder name?', Alias: 'ACCOUNT_HOLDER_NAME' },
 ] as const;
 
 export function parseTextractDocument(response: AnalyzeDocumentCommandOutput): ParsedBillData {
@@ -69,6 +74,7 @@ export function parseTextractDocument(response: AnalyzeDocumentCommandOutput): P
   const total = get('TOTAL_AMOUNT_DUE');
   const due = get('DUE_DATE');
   const biller = get('BILLER_NAME');
+  const holder = answers.get('ACCOUNT_HOLDER_NAME');
   const rawAmount = total.value.replace(/[$,\s]/g, '');
   if (!/^\d+(?:\.\d{1,2})?$/.test(rawAmount)) throw new Error('Textract returned an invalid amount');
   const cents = Math.round(Number(rawAmount) * 100);
@@ -79,6 +85,8 @@ export function parseTextractDocument(response: AnalyzeDocumentCommandOutput): P
     billerName: biller.value,
     confidence: Math.min(account.confidence, total.confidence, due.confidence, biller.confidence),
     merchantId: null,
+    accountHolderName: holder?.value ?? null,
+    noticeText: blocks.filter((block) => block.BlockType === 'LINE' && block.Text).map((block) => block.Text!).join(' '),
   });
 }
 

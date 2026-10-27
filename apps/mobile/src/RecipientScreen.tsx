@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
-import { getBillStatus, uploadBill } from './api';
+import { getBillDetails, uploadBill } from './api';
 import type { FeedBill } from './api';
 import { useAuth } from './AuthContext';
 
@@ -46,11 +46,13 @@ export function RecipientScreen() {
       setStatus('Scanning');
       for (let attempt = 0; attempt < 30; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
-        const current = await getBillStatus(billId, token);
+        const details = await getBillDetails(billId, token);
+        const current = details.status;
         if (current === 'verified') { setStatus('Verified'); return; }
         if (current === 'funded') { setStatus('Funded'); return; }
         if (current === 'settled') { setStatus('Paid'); return; }
-        if (current === 'rejected') { setStatus('Rejected; please contact support'); return; }
+        if (current === 'pending_review') { setStatus(details.rejectionReason ?? 'Manual review required'); return; }
+        if (current === 'rejected') { setStatus(details.rejectionReason ?? 'Rejected; please contact support'); return; }
       }
       setStatus('Scanning continues; check back later');
     } catch (error) {

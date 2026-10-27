@@ -1,5 +1,5 @@
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
-import { and, eq, gt, sum } from 'drizzle-orm';
+import { and, eq, gt, sql, sum } from 'drizzle-orm';
 import { z } from 'zod';
 import { auditLogs, bills, transactions, users } from '@open-relief/db';
 import { decryptAccountNumber } from '@open-relief/db/security/encryption';
@@ -179,6 +179,7 @@ export async function settlePayment(intentId: string, services: Services, method
       settledAt: remainingBalanceCents === 0 ? new Date() : null,
       updatedAt: new Date(),
     }).where(eq(bills.id, bill.id));
+    await tx.update(users).set({ lifetimeAidCents: sql`${users.lifetimeAidCents} + ${transaction.amountToBillCents}`, lastAidAt: new Date() }).where(eq(users.id, bill.recipientId));
     await tx.update(transactions).set({ methodDisbursementId, stripeChargeId: verified?.chargeId ?? null, receiptEmailPayload, status: 'succeeded', updatedAt: new Date() }).where(eq(transactions.id, transaction.id));
     await tx.insert(auditLogs).values({
       id: randomUUID(), eventType: verified ? 'bill.sandbox_settled' : 'bill.mock_settled', actorId: transaction.donorId, billId: bill.id, transactionId: transaction.id,

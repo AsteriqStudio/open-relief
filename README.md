@@ -41,7 +41,7 @@ The end-to-end test uploads a JPEG through the presigned form, checks EXIF remov
 
 ## Authentication and OCR modes
 
-`POST /api/auth/signup` accepts an email, password of at least 12 characters, phone, and `recipient` or `donor` role. `POST /api/auth/signin` returns an opaque session token; clients send it as `Authorization: Bearer <token>`. The server stores only a hash of that token and enforces roles and ownership on bill uploads, donations, and receipts. The mobile app stores the token with Expo SecureStore and supports sign out.
+`POST /api/auth/signup` accepts an email, password of at least 12 characters, phone, and `recipient` or `donor` role. `POST /api/auth/signin` returns a signed JWT session token; clients send it as `Authorization: Bearer <token>`. The server stores only a hash of the token's random session ID for revocation and enforces roles and ownership on bill uploads, donations, and receipts. The mobile app stores the token with Expo SecureStore and supports sign out.
 
 The OCR worker defaults to `OCR_PROVIDER=mock`. Set `OCR_PROVIDER=textract` and `AWS_REGION` when AWS credentials are available through the standard SDK credential chain. The Textract adapter calls `AnalyzeDocument` with account number, amount, due date, and biller name queries. Its extracted bill remains pending manual review until a creditor routing ID is independently verified; extraction alone never authorizes payment.
 

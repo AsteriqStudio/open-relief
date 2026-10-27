@@ -32,8 +32,15 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     };
     const recipient = await signUp('recipient');
     const donor = await signUp('donor');
+    assert.equal(recipient.token.split('.').length, 3);
     const recipientHeaders = { authorization: `Bearer ${recipient.token}` };
     const donorHeaders = { authorization: `Bearer ${donor.token}` };
+    const validSession = await app.inject({ method: 'GET', url: '/api/auth/me', headers: donorHeaders });
+    assert.equal(validSession.statusCode, 200);
+    const jwtParts = donor.token.split('.');
+    jwtParts[1] = `${jwtParts[1]!}x`;
+    const tampered = await app.inject({ method: 'GET', url: '/api/auth/me', headers: { authorization: `Bearer ${jwtParts.join('.')}` } });
+    assert.equal(tampered.statusCode, 401);
     const deniedUpload = await app.inject({ method: 'POST', url: '/api/bills/upload-url', payload: {} });
     assert.equal(deniedUpload.statusCode, 401);
     const wrongRole = await app.inject({ method: 'POST', url: '/api/bills/upload-url', headers: donorHeaders, payload: {} });

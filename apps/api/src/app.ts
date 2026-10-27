@@ -27,7 +27,7 @@ const BillIdSchema = z.object({ id: z.string().uuid() });
 
 export function buildApp(services: Services) {
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
-  const requireAuth = registerAuth(app, services.db);
+  const requireAuth = registerAuth(app, services.db, services.config.AUTH_JWT_SECRET);
   app.removeContentTypeParser('application/json');
   app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (request, body, done) => {
     try {

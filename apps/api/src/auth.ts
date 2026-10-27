@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import { jwtVerify, SignJWT } from 'jose';
 import { z } from 'zod';
 import { authSessions, users } from '@open-relief/db';
 import type { Database } from './services.js';
@@ -15,7 +16,7 @@ const SignUpSchema = z.object({
   role: z.enum(['recipient', 'donor']),
 }).strict();
 const SignInSchema = z.object({ email: EmailSchema, password: z.string().min(1) }).strict();
-const TOKEN_PATTERN = /^Bearer ([A-Za-z0-9_-]{43})$/;
+const TOKEN_PATTERN = /^Bearer ([A-Za-z0-9._-]{64,4096})$/;
 
 export type AuthUser = { id: string; role: 'recipient' | 'donor' | 'admin'; email: string };
 export type AuthRole = AuthUser['role'];
@@ -23,6 +24,7 @@ export type AuthRole = AuthUser['role'];
 declare module 'fastify' {
   interface FastifyRequest {
     user?: AuthUser;
+    sessionHash?: string;
   }
 }
 
@@ -53,23 +55,44 @@ async function verifyPassword(password: string, stored: string): Promise<boolean
   return timingSafeEqual(actual, expected);
 }
 
-async function issueSession(db: Database, user: AuthUser) {
-  const token = randomBytes(32).toString('base64url');
+async function issueSession(db: Database, user: AuthUser, signingKey: Uint8Array) {
+  const jti = randomUUID();
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
-  await db.insert(authSessions).values({ tokenHash: tokenHash(token), userId: user.id, expiresAt });
+  const token = await new SignJWT({ role: user.role, email: user.email })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuer('open-relief')
+    .setAudience('open-relief-mobile')
+    .setSubject(user.id)
+    .setJti(jti)
+    .setIssuedAt()
+    .setExpirationTime(Math.floor(expiresAt.getTime() / 1000))
+    .sign(signingKey);
+  await db.insert(authSessions).values({ tokenHash: tokenHash(jti), userId: user.id, expiresAt });
   return { token, expiresAt: expiresAt.toISOString(), user };
 }
 
-export function registerAuth(app: FastifyInstance, db: Database) {
+export function registerAuth(app: FastifyInstance, db: Database, secretHex: string) {
+  const signingKey = Buffer.from(secretHex, 'hex');
   const requireAuth = (options: { roles?: AuthRole[] } = {}) => async (request: FastifyRequest, reply: FastifyReply) => {
     const match = TOKEN_PATTERN.exec(request.headers.authorization ?? '');
     if (!match) return reply.code(401).send({ error: 'Authentication required' });
+    let jti: string;
+    let subject: string;
+    try {
+      const verified = await jwtVerify(match[1]!, signingKey, { algorithms: ['HS256'], issuer: 'open-relief', audience: 'open-relief-mobile' });
+      if (!verified.payload.jti || !verified.payload.sub) throw new Error('Missing session claims');
+      jti = verified.payload.jti;
+      subject = verified.payload.sub;
+    } catch {
+      return reply.code(401).send({ error: 'Invalid or expired session' });
+    }
     const [record] = await db.select({ id: users.id, role: users.role, email: users.email }).from(authSessions)
       .innerJoin(users, eq(authSessions.userId, users.id))
-      .where(and(eq(authSessions.tokenHash, tokenHash(match[1]!)), gt(authSessions.expiresAt, new Date()), isNull(authSessions.revokedAt)));
-    if (!record) return reply.code(401).send({ error: 'Session expired or revoked' });
+      .where(and(eq(authSessions.tokenHash, tokenHash(jti)), gt(authSessions.expiresAt, new Date()), isNull(authSessions.revokedAt)));
+    if (!record || record.id !== subject) return reply.code(401).send({ error: 'Session expired or revoked' });
     if (options.roles && !options.roles.includes(record.role)) return reply.code(403).send({ error: 'Role not permitted' });
     request.user = record;
+    request.sessionHash = tokenHash(jti);
   };
 
   app.post('/api/auth/signup', async (request, reply) => {
@@ -83,7 +106,7 @@ export function registerAuth(app: FastifyInstance, db: Database) {
       if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') return reply.code(409).send({ error: 'Email already registered' });
       throw error;
     }
-    return reply.code(201).send(await issueSession(db, user));
+    return reply.code(201).send(await issueSession(db, user, signingKey));
   });
 
   app.post('/api/auth/signin', async (request, reply) => {
@@ -92,13 +115,12 @@ export function registerAuth(app: FastifyInstance, db: Database) {
     if (!user?.passwordHash || !await verifyPassword(input.password, user.passwordHash)) {
       return reply.code(401).send({ error: 'Invalid credentials' });
     }
-    return issueSession(db, { id: user.id, role: user.role, email: user.email });
+    return issueSession(db, { id: user.id, role: user.role, email: user.email }, signingKey);
   });
 
   app.get('/api/auth/me', { preHandler: requireAuth() }, async (request) => ({ user: request.user }));
   app.post('/api/auth/logout', { preHandler: requireAuth() }, async (request) => {
-    const match = TOKEN_PATTERN.exec(request.headers.authorization ?? '');
-    await db.update(authSessions).set({ revokedAt: new Date() }).where(eq(authSessions.tokenHash, tokenHash(match![1]!)));
+    await db.update(authSessions).set({ revokedAt: new Date() }).where(eq(authSessions.tokenHash, request.sessionHash!));
     return { signedOut: true };
   });
 

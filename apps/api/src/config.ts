@@ -9,6 +9,7 @@ export const ApiConfigSchema = z.object({
   S3_ACCESS_KEY: z.string().min(1),
   S3_SECRET_KEY: z.string().min(1),
   ENCRYPTION_KEY_HEX: z.string().regex(/^[0-9a-fA-F]{64}$/),
+  AUTH_JWT_SECRET: z.string().regex(/^[0-9a-fA-F]{64}$/),
   MOCK_STRIPE_WEBHOOK_SECRET: z.string().min(16),
   OCR_PROVIDER: z.enum(['mock', 'textract']).default('mock'),
   AWS_REGION: z.string().min(1).optional(),

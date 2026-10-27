@@ -4,11 +4,12 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 import { getBillStatus, uploadBill } from './api';
 import type { FeedBill } from './api';
+import { useAuth } from './AuthContext';
 
-const DEMO_RECIPIENT_ID = '00000000-0000-4000-8000-000000000101';
 type SelectedFile = { uri: string; name: string; mimeType: 'image/jpeg' | 'image/png' | 'application/pdf' };
 
 export function RecipientScreen() {
+  const { token } = useAuth();
   const [category, setCategory] = useState<FeedBill['category']>('electric');
   const [zipCode, setZipCode] = useState('48201');
   const [story, setStory] = useState('Household needs help with an overdue utility bill');
@@ -37,15 +38,15 @@ export function RecipientScreen() {
   }
 
   async function submit() {
-    if (!file || busy) return;
+    if (!file || !token || busy) return;
     setBusy(true);
     try {
       setStatus('Uploaded');
-      const billId = await uploadBill({ ...file, recipientId: DEMO_RECIPIENT_ID, category, zipCode, story });
+      const billId = await uploadBill({ ...file, category, zipCode, story }, token);
       setStatus('Scanning');
       for (let attempt = 0; attempt < 30; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
-        const current = await getBillStatus(billId);
+        const current = await getBillStatus(billId, token);
         if (current === 'verified') { setStatus('Verified'); return; }
         if (current === 'funded') { setStatus('Funded'); return; }
         if (current === 'settled') { setStatus('Paid'); return; }

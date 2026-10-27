@@ -11,8 +11,17 @@ export const users = pgTable('users', {
   role: userRole('role').notNull(),
   email: text('email').notNull(),
   phone: text('phone').notNull(),
+  passwordHash: text('password_hash'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [uniqueIndex('users_email_unique').on(table.email)]);
+
+export const authSessions = pgTable('auth_sessions', {
+  tokenHash: text('token_hash').primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+}, (table) => [index('auth_sessions_user_idx').on(table.userId)]);
 
 export const bills = pgTable('bills', {
   id: uuid('id').primaryKey(),

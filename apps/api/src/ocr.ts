@@ -1,27 +1,28 @@
-import { AnalyzeExpenseCommand, TextractClient } from '@aws-sdk/client-textract';
+import { AnalyzeDocumentCommand, TextractClient } from '@aws-sdk/client-textract';
+import type { AnalyzeDocumentCommandOutput } from '@aws-sdk/client-textract';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 
-export const OcrResultSchema = z.object({
+export const ParsedBillDataSchema = z.object({
   billerName: z.string().min(1),
   accountNumber: z.string().min(1),
   dueDate: z.string().date(),
-  statementBalanceCents: z.number().int().positive(),
+  statementBalanceCents: z.number().int().positive().max(2_147_483_647),
   confidence: z.number().min(0).max(100),
   merchantId: z.string().min(1).nullable(),
 }).strict();
 
-export type OcrResult = z.infer<typeof OcrResultSchema>;
+export type ParsedBillData = z.infer<typeof ParsedBillDataSchema>;
 
 export interface IOCRExtractor {
-  extract(bytes: Uint8Array): Promise<OcrResult>;
+  extract(bytes: Uint8Array): Promise<ParsedBillData>;
 }
 
 export class MockOCRExtractor implements IOCRExtractor {
-  async extract(bytes: Uint8Array): Promise<OcrResult> {
+  async extract(bytes: Uint8Array): Promise<ParsedBillData> {
     const hash = createHash('sha256').update(bytes).digest('hex');
     const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    return OcrResultSchema.parse({
+    return ParsedBillDataSchema.parse({
       billerName: 'Demo Utility',
       accountNumber: `DEMO-${hash.slice(0, 16)}`,
       dueDate,
@@ -42,30 +43,58 @@ function dateFromDocument(value: string): string {
   return date;
 }
 
+const TEXTRACT_QUERIES = [
+  { Text: 'What is the account number?', Alias: 'ACCOUNT_NUMBER' },
+  { Text: 'What is the total amount due?', Alias: 'TOTAL_AMOUNT_DUE' },
+  { Text: 'What is the due date?', Alias: 'DUE_DATE' },
+  { Text: 'What is the utility or biller name?', Alias: 'BILLER_NAME' },
+] as const;
+
+export function parseTextractDocument(response: AnalyzeDocumentCommandOutput): ParsedBillData {
+  const blocks = response.Blocks ?? [];
+  const byId = new Map(blocks.filter((block) => block.Id).map((block) => [block.Id!, block]));
+  const answers = new Map<string, { value: string; confidence: number }>();
+  for (const block of blocks) {
+    if (block.BlockType !== 'QUERY' || !block.Query?.Alias) continue;
+    const ids = block.Relationships?.filter((relation) => relation.Type === 'ANSWER').flatMap((relation) => relation.Ids ?? []) ?? [];
+    const result = ids.map((id) => byId.get(id)).find((answer) => answer?.BlockType === 'QUERY_RESULT' && answer.Text?.trim());
+    if (result?.Text) answers.set(block.Query.Alias, { value: result.Text.trim(), confidence: Math.max(0, Math.min(100, result.Confidence ?? 0)) });
+  }
+  const get = (alias: string) => {
+    const answer = answers.get(alias);
+    if (!answer) throw new Error(`Textract did not answer ${alias}`);
+    return answer;
+  };
+  const account = get('ACCOUNT_NUMBER');
+  const total = get('TOTAL_AMOUNT_DUE');
+  const due = get('DUE_DATE');
+  const biller = get('BILLER_NAME');
+  const rawAmount = total.value.replace(/[$,\s]/g, '');
+  if (!/^\d+(?:\.\d{1,2})?$/.test(rawAmount)) throw new Error('Textract returned an invalid amount');
+  const cents = Math.round(Number(rawAmount) * 100);
+  return ParsedBillDataSchema.parse({
+    accountNumber: account.value,
+    statementBalanceCents: cents,
+    dueDate: dateFromDocument(due.value),
+    billerName: biller.value,
+    confidence: Math.min(account.confidence, total.confidence, due.confidence, biller.confidence),
+    merchantId: null,
+  });
+}
+
 export class AWSTextractExtractor implements IOCRExtractor {
   constructor(private readonly client: TextractClient) {}
 
-  async extract(bytes: Uint8Array): Promise<OcrResult> {
-    const response = await this.client.send(new AnalyzeExpenseCommand({ Document: { Bytes: bytes } }));
-    const fields = response.ExpenseDocuments?.flatMap((document) => document.SummaryFields ?? []) ?? [];
-    const getField = (...names: string[]) => {
-      const field = fields.find((entry) => names.includes(entry.Type?.Text ?? ''));
-      if (!field?.ValueDetection?.Text) throw new Error(`OCR missing ${names[0]}`);
-      return { value: field.ValueDetection.Text, confidence: field.ValueDetection.Confidence ?? 0 };
-    };
-    const vendor = getField('VENDOR_NAME');
-    const account = getField('ACCOUNT_NUMBER', 'INVOICE_RECEIPT_ID');
-    const due = getField('DUE_DATE');
-    const total = getField('TOTAL', 'AMOUNT_DUE');
-    const decimal = Number(total.value.replace(/[^\d.]/g, ''));
-    if (!Number.isFinite(decimal) || !/^\d+(?:\.\d{1,2})?$/.test(total.value.replace(/[$,\s]/g, ''))) throw new Error('OCR returned an invalid amount');
-    return OcrResultSchema.parse({
-      billerName: vendor.value.trim(),
-      accountNumber: account.value.trim(),
-      dueDate: dateFromDocument(due.value),
-      statementBalanceCents: Math.round(decimal * 100),
-      confidence: Math.min(vendor.confidence, account.confidence, due.confidence, total.confidence),
-      merchantId: null,
-    });
+  async extract(bytes: Uint8Array): Promise<ParsedBillData> {
+    const response = await this.client.send(new AnalyzeDocumentCommand({
+      Document: { Bytes: bytes },
+      FeatureTypes: ['QUERIES', 'TABLES'],
+      QueriesConfig: { Queries: [...TEXTRACT_QUERIES] },
+    }));
+    return parseTextractDocument(response);
   }
+}
+
+export function createOCRExtractor(provider: 'mock' | 'textract', region: string): IOCRExtractor {
+  return provider === 'textract' ? new AWSTextractExtractor(new TextractClient({ region })) : new MockOCRExtractor();
 }

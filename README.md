@@ -14,7 +14,7 @@ bash scripts/start-local.sh
 
 The startup script creates an ignored `.env.local` with random local credentials if needed, starts PostgreSQL, Redis, and MinIO, applies migrations, seeds five demo bills, builds the server packages, and runs the API and OCR worker. It preserves an existing `.env.local`. Stop the foreground script to stop the API and worker; use `docker compose --env-file .env.local down` to stop local services. Data volumes remain until explicitly removed.
 
-The API listens on `http://127.0.0.1:3000`. A successful `GET /health` returns `{"status":"ok"}`. `GET /api/bills/feed` lists the verified demo bills.
+The API listens on `http://127.0.0.1:3000`. A successful `GET /health` returns `{"status":"ok"}`. `GET /api/bills/feed` lists the verified demo bills. Create a recipient or donor account in the mobile app to upload bills or simulate donations. Seeded demo users cannot sign in because they have no passwords.
 
 In another terminal, run the Expo app:
 
@@ -39,10 +39,16 @@ EXPO_NO_TELEMETRY=1 EXPO_OFFLINE=1 pnpm --filter @open-relief/mobile export
 
 The end-to-end test uploads a JPEG through the presigned form, checks EXIF removal, waits for mock OCR, rejects a duplicate, creates a mock donation, verifies the webhook signature and replay handling, and confirms the bill is settled. It creates uniquely identified demo data on each run.
 
+## Authentication and OCR modes
+
+`POST /api/auth/signup` accepts an email, password of at least 12 characters, phone, and `recipient` or `donor` role. `POST /api/auth/signin` returns an opaque session token; clients send it as `Authorization: Bearer <token>`. The server stores only a hash of that token and enforces roles and ownership on bill uploads, donations, and receipts. The mobile app stores the token with Expo SecureStore and supports sign out.
+
+The OCR worker defaults to `OCR_PROVIDER=mock`. Set `OCR_PROVIDER=textract` and `AWS_REGION` when AWS credentials are available through the standard SDK credential chain. The Textract adapter calls `AnalyzeDocument` with account number, amount, due date, and biller name queries. Its extracted bill remains pending manual review until a creditor routing ID is independently verified; extraction alone never authorizes payment.
+
 ## Boundaries
 
 - The mock Stripe and Method adapters never charge or disburse real funds. The mobile checkout simulates payment; wallet and card SDK checkout is not active.
 - The mock OCR adapter recognizes only a demo biller. Textract extraction can produce a bill for manual review, but it cannot approve a live creditor or route money.
-- The API has demo identities and no user authentication. It is bound to loopback for local development and must not be exposed publicly.
+- Authentication uses local password accounts and revocable database sessions. Email verification, password recovery, abuse throttling, and a protected admin review workflow are still required before public deployment. The API remains bound to loopback.
 - Payment confirmations make no tax-deductibility claim. Direct bill payments are not automatically charitable contributions.
 - A future live design needs verified creditor routing, payment-provider coordination, authentication, privacy and fraud controls, and legal review. A Stripe charge followed by a separate disbursement does not alone establish that the platform avoids custody or money-transmission obligations.

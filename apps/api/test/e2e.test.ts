@@ -5,16 +5,12 @@ import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { Worker } from 'bullmq';
 import { Redis } from 'ioredis';
 import sharp from 'sharp';
-import { users } from '@open-relief/db';
 import { buildApp } from '../dist/app.js';
 import { ApiConfigSchema } from '../dist/config.js';
 import { processUploadedBill } from '../dist/ingestion.js';
 import { MockOCRExtractor } from '../dist/ocr.js';
 import { signMockStripeEvent } from '../dist/payments.js';
 import { BILL_QUEUE_NAME, createServices } from '../dist/services.js';
-
-const recipientId = '00000000-0000-4000-8000-000000000101';
-const donorId = '00000000-0000-4000-8000-000000000102';
 
 test('upload through mock OCR to direct demo creditor settlement', async () => {
   const config = ApiConfigSchema.parse(process.env);
@@ -28,15 +24,28 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
   try {
     await app.ready();
     await worker.waitUntilReady();
-    await services.db.insert(users).values([
-      { id: recipientId, role: 'recipient', email: 'recipient@example.invalid', phone: '+15555550101' },
-      { id: donorId, role: 'donor', email: 'donor@example.invalid', phone: '+15555550102' },
-    ]).onConflictDoNothing();
+    const signUp = async (role: 'recipient' | 'donor') => {
+      const email = `${role}-${randomUUID()}@example.invalid`;
+      const response = await app.inject({ method: 'POST', url: '/api/auth/signup', payload: { email, password: 'local test password 2026', phone: '+15555550123', role } });
+      assert.equal(response.statusCode, 201, response.body);
+      return response.json<{ token: string; user: { id: string; role: string; email: string } }>();
+    };
+    const recipient = await signUp('recipient');
+    const donor = await signUp('donor');
+    const recipientHeaders = { authorization: `Bearer ${recipient.token}` };
+    const donorHeaders = { authorization: `Bearer ${donor.token}` };
+    const deniedUpload = await app.inject({ method: 'POST', url: '/api/bills/upload-url', payload: {} });
+    assert.equal(deniedUpload.statusCode, 401);
+    const wrongRole = await app.inject({ method: 'POST', url: '/api/bills/upload-url', headers: donorHeaders, payload: {} });
+    assert.equal(wrongRole.statusCode, 403);
+    const signIn = await app.inject({ method: 'POST', url: '/api/auth/signin', payload: { email: donor.user.email, password: 'local test password 2026' } });
+    assert.equal(signIn.statusCode, 200);
+    assert.equal(signIn.json<{ user: { id: string } }>().user.id, donor.user.id);
     const color = randomBytes(3);
     const image = await sharp({ create: { width: 3, height: 3, channels: 3, background: { r: color[0]!, g: color[1]!, b: color[2]! } } }).jpeg().withExif({ IFD0: { Copyright: 'metadata to strip' } }).toBuffer();
     const submit = async () => {
-      const response = await app.inject({ method: 'POST', url: '/api/bills/upload-url', payload: {
-        recipientId, category: 'electric', mimeType: 'image/jpeg', sizeBytes: image.length, zipCode: '48201', story: 'Demo family facing an overdue power bill',
+      const response = await app.inject({ method: 'POST', url: '/api/bills/upload-url', headers: recipientHeaders, payload: {
+        category: 'electric', mimeType: 'image/jpeg', sizeBytes: image.length, zipCode: '48201', story: 'Demo family facing an overdue power bill',
       } });
       assert.equal(response.statusCode, 201, response.body);
       const details = response.json<{ billId: string; url: string; fields: Record<string, string> }>();
@@ -45,7 +54,7 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
       form.set('file', new Blob([image], { type: 'image/jpeg' }), 'bill.jpg');
       const upload = await fetch(details.url, { method: 'POST', body: form });
       assert.ok(upload.ok, `S3 upload failed: ${upload.status} ${await upload.text()}`);
-      const complete = await app.inject({ method: 'POST', url: `/api/bills/${details.billId}/complete` });
+      const complete = await app.inject({ method: 'POST', url: `/api/bills/${details.billId}/complete`, headers: recipientHeaders });
       assert.equal(complete.statusCode, 202, complete.body);
       return details.billId;
     };
@@ -53,7 +62,7 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     let billStatus = 'pending_ocr';
     for (let attempt = 0; attempt < 50; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 100));
-      const status = await app.inject({ method: 'GET', url: `/api/bills/${billId}` });
+      const status = await app.inject({ method: 'GET', url: `/api/bills/${billId}`, headers: recipientHeaders });
       billStatus = status.json<{ status: string }>().status;
       if (billStatus !== 'pending_ocr') break;
     }
@@ -65,8 +74,8 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     const feed = (await app.inject({ method: 'GET', url: '/api/bills/feed' })).json<{ bills: Array<{ id: string }> }>();
     assert.ok(feed.bills.some((bill) => bill.id === billId));
 
-    const intentResponse = await app.inject({ method: 'POST', url: '/api/donations/create-intent', payload: {
-      billId, donorId, billAmountCents: 12_000, coverProcessingFee: true, tipPercentage: 0, idempotencyKey: randomUUID(),
+    const intentResponse = await app.inject({ method: 'POST', url: '/api/donations/create-intent', headers: donorHeaders, payload: {
+      billId, billAmountCents: 12_000, coverProcessingFee: true, tipPercentage: 0, idempotencyKey: randomUUID(),
     } });
     assert.equal(intentResponse.statusCode, 201, intentResponse.body);
     const intent = intentResponse.json<{ transactionId: string; paymentIntentId: string; mode: string }>();
@@ -80,10 +89,10 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     assert.equal(webhook.json<{ settlement: { alreadyProcessed: boolean } }>().settlement.alreadyProcessed, false);
     const replay = await app.inject({ method: 'POST', url: '/api/webhooks/stripe', headers: { 'content-type': 'application/json', 'stripe-signature': signature }, payload });
     assert.equal(replay.json<{ settlement: { alreadyProcessed: boolean } }>().settlement.alreadyProcessed, true);
-    const settled = (await app.inject({ method: 'GET', url: `/api/bills/${billId}` })).json<{ status: string; remainingBalanceCents: number }>();
+    const settled = (await app.inject({ method: 'GET', url: `/api/bills/${billId}`, headers: recipientHeaders })).json<{ status: string; remainingBalanceCents: number }>();
     assert.equal(settled.status, 'settled');
     assert.equal(settled.remainingBalanceCents, 0);
-    const receipt = await app.inject({ method: 'GET', url: `/api/donations/${intent.transactionId}/receipt` });
+    const receipt = await app.inject({ method: 'GET', url: `/api/donations/${intent.transactionId}/receipt`, headers: donorHeaders });
     assert.equal(receipt.statusCode, 200);
     assert.match(receipt.json<{ taxNotice: string }>().taxNotice, /does not establish/);
 
@@ -91,10 +100,14 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     let duplicateStatus = 'pending_ocr';
     for (let attempt = 0; attempt < 50; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 100));
-      duplicateStatus = (await app.inject({ method: 'GET', url: `/api/bills/${duplicateId}` })).json<{ status: string }>().status;
+      duplicateStatus = (await app.inject({ method: 'GET', url: `/api/bills/${duplicateId}`, headers: recipientHeaders })).json<{ status: string }>().status;
       if (duplicateStatus !== 'pending_ocr') break;
     }
     assert.equal(duplicateStatus, 'rejected');
+    const logout = await app.inject({ method: 'POST', url: '/api/auth/logout', headers: donorHeaders });
+    assert.equal(logout.statusCode, 200);
+    const expired = await app.inject({ method: 'GET', url: '/api/auth/me', headers: donorHeaders });
+    assert.equal(expired.statusCode, 401);
   } finally {
     await worker.close();
     await app.close();

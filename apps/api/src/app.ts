@@ -1,10 +1,11 @@
 import { HeadObjectCommand } from '@aws-sdk/client-s3';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
 import { randomUUID } from 'node:crypto';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { desc, eq, inArray } from 'drizzle-orm';
 import Fastify from 'fastify';
 import { z, ZodError } from 'zod';
-import { bills, transactions, users } from '@open-relief/db';
+import { bills, transactions } from '@open-relief/db';
+import { registerAuth } from './auth.js';
 import { CreateIntentSchema, createDonationIntent, failMockPayment, settleMockPayment, verifyMockStripeEvent } from './payments.js';
 import type { Services } from './services.js';
 
@@ -16,7 +17,6 @@ declare module 'fastify' {
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const UploadRequestSchema = z.object({
-  recipientId: z.string().uuid(),
   category: z.enum(['electric', 'water', 'gas', 'medical']),
   mimeType: z.enum(['image/jpeg', 'image/png', 'application/pdf']),
   sizeBytes: z.number().int().positive().max(MAX_BYTES),
@@ -27,6 +27,7 @@ const BillIdSchema = z.object({ id: z.string().uuid() });
 
 export function buildApp(services: Services) {
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
+  const requireAuth = registerAuth(app, services.db);
   app.removeContentTypeParser('application/json');
   app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (request, body, done) => {
     try {
@@ -51,10 +52,8 @@ export function buildApp(services: Services) {
 
   app.get('/health', async () => ({ status: 'ok' }));
 
-  app.post('/api/bills/upload-url', async (request, reply) => {
+  app.post('/api/bills/upload-url', { preHandler: requireAuth({ roles: ['recipient'] }) }, async (request, reply) => {
     const input = UploadRequestSchema.parse(request.body);
-    const [recipient] = await services.db.select({ id: users.id }).from(users).where(and(eq(users.id, input.recipientId), eq(users.role, 'recipient')));
-    if (!recipient) return reply.code(404).send({ error: 'Recipient not found' });
     const billId = randomUUID();
     const key = `bills/${billId}/original`;
     const post = await createPresignedPost(services.s3, {
@@ -66,7 +65,7 @@ export function buildApp(services: Services) {
     });
     await services.db.insert(bills).values({
       id: billId,
-      recipientId: input.recipientId,
+      recipientId: request.user!.id,
       category: input.category,
       documentUrl: `s3://${services.config.S3_BUCKET}/${key}`,
       documentKey: key,
@@ -78,10 +77,11 @@ export function buildApp(services: Services) {
     return reply.code(201).send({ billId, url: post.url, fields: post.fields, expiresInSeconds: 300 });
   });
 
-  app.post('/api/bills/:id/complete', async (request, reply) => {
+  app.post('/api/bills/:id/complete', { preHandler: requireAuth({ roles: ['recipient'] }) }, async (request, reply) => {
     const { id } = BillIdSchema.parse(request.params);
     const [bill] = await services.db.select().from(bills).where(eq(bills.id, id));
     if (!bill) return reply.code(404).send({ error: 'Bill not found' });
+    if (bill.recipientId !== request.user!.id) return reply.code(403).send({ error: 'Bill belongs to another recipient' });
     if (bill.status !== 'pending_ocr') return reply.code(409).send({ error: 'Bill is not awaiting OCR' });
     const metadata = await services.s3.send(new HeadObjectCommand({ Bucket: services.config.S3_BUCKET, Key: `bills/${id}/original` }));
     if (!metadata.ContentLength || metadata.ContentLength > MAX_BYTES || metadata.ContentType !== bill.documentMimeType) {
@@ -91,10 +91,13 @@ export function buildApp(services: Services) {
     return reply.code(202).send({ billId: id, status: 'scanning' });
   });
 
-  app.get('/api/bills/:id', async (request, reply) => {
+  app.get('/api/bills/:id', { preHandler: requireAuth() }, async (request, reply) => {
     const { id } = BillIdSchema.parse(request.params);
-    const [bill] = await services.db.select({ id: bills.id, status: bills.status, remainingBalanceCents: bills.remainingBalanceCents }).from(bills).where(eq(bills.id, id));
-    return bill ?? reply.code(404).send({ error: 'Bill not found' });
+    const [bill] = await services.db.select({ id: bills.id, recipientId: bills.recipientId, status: bills.status, remainingBalanceCents: bills.remainingBalanceCents }).from(bills).where(eq(bills.id, id));
+    if (!bill || ((bill.status === 'pending_ocr' || bill.status === 'rejected') && bill.recipientId !== request.user!.id && request.user!.role !== 'admin')) {
+      return reply.code(404).send({ error: 'Bill not found' });
+    }
+    return { id: bill.id, status: bill.status, remainingBalanceCents: bill.remainingBalanceCents };
   });
 
   app.get('/api/bills/feed', async () => {
@@ -111,9 +114,9 @@ export function buildApp(services: Services) {
     return { bills: rows };
   });
 
-  app.post('/api/donations/create-intent', async (request, reply) => {
-    const input = CreateIntentSchema.parse(request.body);
-    const result = await createDonationIntent(input, services);
+  app.post('/api/donations/create-intent', { preHandler: requireAuth({ roles: ['donor'] }) }, async (request, reply) => {
+    const input = CreateIntentSchema.omit({ donorId: true }).parse(request.body);
+    const result = await createDonationIntent({ ...input, donorId: request.user!.id }, services);
     return reply.code(201).send({ ...result, mode: 'mock' });
   });
 
@@ -133,17 +136,19 @@ export function buildApp(services: Services) {
     return { received: true, settlement: await settleMockPayment(event.data.object.id, services) };
   });
 
-  app.post('/api/demo/donations/:id/complete', async (request, reply) => {
+  app.post('/api/demo/donations/:id/complete', { preHandler: requireAuth({ roles: ['donor'] }) }, async (request, reply) => {
     const { id } = BillIdSchema.parse(request.params);
-    const [transaction] = await services.db.select({ paymentIntentId: transactions.stripePaymentIntentId }).from(transactions).where(eq(transactions.id, id));
+    const [transaction] = await services.db.select({ paymentIntentId: transactions.stripePaymentIntentId, donorId: transactions.donorId }).from(transactions).where(eq(transactions.id, id));
     if (!transaction?.paymentIntentId) return reply.code(404).send({ error: 'Mock donation not found' });
+    if (transaction.donorId !== request.user!.id) return reply.code(403).send({ error: 'Donation belongs to another donor' });
     return { mode: 'mock', settlement: await settleMockPayment(transaction.paymentIntentId, services) };
   });
 
-  app.get('/api/donations/:id/receipt', async (request, reply) => {
+  app.get('/api/donations/:id/receipt', { preHandler: requireAuth({ roles: ['donor', 'admin'] }) }, async (request, reply) => {
     const { id } = BillIdSchema.parse(request.params);
     const [row] = await services.db.select({
       id: transactions.id,
+      donorId: transactions.donorId,
       status: transactions.status,
       amountToBillCents: transactions.amountToBillCents,
       totalChargeCents: transactions.totalChargeCents,
@@ -154,6 +159,7 @@ export function buildApp(services: Services) {
       createdAt: transactions.createdAt,
     }).from(transactions).innerJoin(bills, eq(transactions.billId, bills.id)).where(eq(transactions.id, id));
     if (!row || row.status !== 'succeeded') return reply.code(404).send({ error: 'Settled donation not found' });
+    if (row.donorId !== request.user!.id && request.user!.role !== 'admin') return reply.code(403).send({ error: 'Receipt belongs to another donor' });
     return {
       ...row,
       mode: 'mock',

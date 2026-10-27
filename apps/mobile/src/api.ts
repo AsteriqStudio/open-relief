@@ -14,9 +14,15 @@ const BillSchema = z.object({
 });
 
 export type FeedBill = z.infer<typeof BillSchema>;
+const AuthUserSchema = z.object({ id: z.string().uuid(), role: z.enum(['recipient', 'donor', 'admin']), email: z.string().email() });
+const SessionSchema = z.object({ token: z.string().min(1), expiresAt: z.string().datetime(), user: AuthUserSchema });
+export type AuthUser = z.infer<typeof AuthUserSchema>;
+export type AuthSession = z.infer<typeof SessionSchema>;
 
-async function request(path: string, init?: RequestInit): Promise<unknown> {
-  const response = await fetch(`${API_BASE}${path}`, init);
+async function request(path: string, init?: RequestInit, token?: string): Promise<unknown> {
+  const headers = new Headers(init?.headers);
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
   const body: unknown = await response.json();
   if (!response.ok) {
     const message = z.object({ error: z.string() }).safeParse(body);
@@ -25,19 +31,34 @@ async function request(path: string, init?: RequestInit): Promise<unknown> {
   return body;
 }
 
+export async function signUp(input: { email: string; password: string; phone: string; role: 'recipient' | 'donor' }): Promise<AuthSession> {
+  return SessionSchema.parse(await request('/api/auth/signup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
+}
+
+export async function signIn(input: { email: string; password: string }): Promise<AuthSession> {
+  return SessionSchema.parse(await request('/api/auth/signin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input) }));
+}
+
+export async function currentUser(token: string): Promise<AuthUser> {
+  return z.object({ user: AuthUserSchema }).parse(await request('/api/auth/me', undefined, token)).user;
+}
+
+export async function signOut(token: string): Promise<void> {
+  await request('/api/auth/logout', { method: 'POST' }, token);
+}
+
 export async function getFeed(): Promise<FeedBill[]> {
   return z.object({ bills: z.array(BillSchema) }).parse(await request('/api/bills/feed')).bills;
 }
 
 export async function uploadBill(input: {
-  recipientId: string;
   category: FeedBill['category'];
   zipCode: string;
   story: string;
   uri: string;
   mimeType: 'image/jpeg' | 'image/png' | 'application/pdf';
   name: string;
-}): Promise<string> {
+}, token: string): Promise<string> {
   const file = await (await fetch(input.uri)).blob();
   const details = z.object({
     billId: z.string().uuid(),
@@ -46,33 +67,32 @@ export async function uploadBill(input: {
   }).parse(await request('/api/bills/upload-url', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ recipientId: input.recipientId, category: input.category, zipCode: input.zipCode, story: input.story, mimeType: input.mimeType, sizeBytes: file.size }),
-  }));
+    body: JSON.stringify({ category: input.category, zipCode: input.zipCode, story: input.story, mimeType: input.mimeType, sizeBytes: file.size }),
+  }, token));
   const form = new FormData();
   for (const [key, value] of Object.entries(details.fields)) form.append(key, value);
   form.append('file', file, input.name);
   const upload = await fetch(details.url, { method: 'POST', body: form });
   if (!upload.ok) throw new Error(`Document upload failed (${upload.status})`);
-  await request(`/api/bills/${details.billId}/complete`, { method: 'POST' });
+  await request(`/api/bills/${details.billId}/complete`, { method: 'POST' }, token);
   return details.billId;
 }
 
-export async function getBillStatus(id: string): Promise<'pending_ocr' | 'verified' | 'funded' | 'settled' | 'rejected'> {
-  return z.object({ status: z.enum(['pending_ocr', 'verified', 'funded', 'settled', 'rejected']) }).parse(await request(`/api/bills/${id}`)).status;
+export async function getBillStatus(id: string, token: string): Promise<'pending_ocr' | 'verified' | 'funded' | 'settled' | 'rejected'> {
+  return z.object({ status: z.enum(['pending_ocr', 'verified', 'funded', 'settled', 'rejected']) }).parse(await request(`/api/bills/${id}`, undefined, token)).status;
 }
 
 export async function simulateDonation(input: {
   billId: string;
-  donorId: string;
   billAmountCents: number;
   coverProcessingFee: boolean;
   tipPercentage: number;
-}): Promise<string> {
+}, token: string): Promise<string> {
   const result = z.object({ transactionId: z.string().uuid(), mode: z.literal('mock') }).parse(await request('/api/donations/create-intent', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...input, idempotencyKey: randomUUID() }),
-  }));
-  await request(`/api/demo/donations/${result.transactionId}/complete`, { method: 'POST' });
+  }, token));
+  await request(`/api/demo/donations/${result.transactionId}/complete`, { method: 'POST' }, token);
   return result.transactionId;
 }

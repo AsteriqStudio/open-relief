@@ -6,8 +6,8 @@ import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 
 import { calculateDonationSplit } from '@open-relief/shared';
 import { getFeed, simulateDonation } from './api';
 import type { FeedBill } from './api';
+import { useAuth } from './AuthContext';
 
-const DEMO_DONOR_ID = '00000000-0000-4000-8000-000000000102';
 const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
 function SwipeableBillCard({ bill, onGive, onPass }: { bill: FeedBill; onGive(): void; onPass(): void }) {
@@ -36,6 +36,7 @@ function SwipeableBillCard({ bill, onGive, onPass }: { bill: FeedBill; onGive():
 }
 
 function CheckoutSheet({ bill, onClose, onComplete }: { bill: FeedBill | null; onClose(): void; onComplete(): void }) {
+  const { token } = useAuth();
   const sheet = useRef<BottomSheetModal>(null);
   const [percentage, setPercentage] = useState<25 | 50 | 100 | null>(null);
   const [tipPercentage, setTipPercentage] = useState<0 | 10 | 15 | 20 | null>(null);
@@ -55,11 +56,11 @@ function CheckoutSheet({ bill, onClose, onComplete }: { bill: FeedBill | null; o
   const split = useMemo(() => amountCents && tipPercentage !== null ? calculateDonationSplit({ billAmountCents: amountCents, coverProcessingFee, tipPercentage }) : null, [amountCents, coverProcessingFee, tipPercentage]);
 
   async function donate() {
-    if (!bill || !amountCents || !split || tipPercentage === null || busy) return;
+    if (!bill || !amountCents || !split || tipPercentage === null || !token || busy) return;
     setBusy(true);
     setError(null);
     try {
-      await simulateDonation({ billId: bill.id, donorId: DEMO_DONOR_ID, billAmountCents: amountCents, coverProcessingFee, tipPercentage });
+      await simulateDonation({ billId: bill.id, billAmountCents: amountCents, coverProcessingFee, tipPercentage }, token);
       sheet.current?.dismiss();
       onComplete();
     } catch (failure) {

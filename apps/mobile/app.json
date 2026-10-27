@@ -6,7 +6,7 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "plugins": ["expo-image-picker", "expo-document-picker"],
+    "plugins": ["expo-image-picker", "expo-document-picker", "expo-secure-store"],
     "ios": {
       "supportsTablet": true
     },

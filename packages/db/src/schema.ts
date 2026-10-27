@@ -46,6 +46,7 @@ export const bills = pgTable('bills', {
   story: text('story'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  settledAt: timestamp('settled_at', { withTimezone: true }),
 }, (table) => [
   index('bills_feed_idx').on(table.status, table.createdAt),
   index('bills_duplicate_idx').on(table.duplicateFingerprint, table.createdAt),
@@ -64,8 +65,10 @@ export const transactions = pgTable('transactions', {
   stripeFeeCents: integer('stripe_fee_cents').notNull(),
   netPlatformTipCents: integer('net_platform_tip_cents').notNull(),
   stripePaymentIntentId: text('stripe_payment_intent_id'),
+  stripeChargeId: text('stripe_charge_id'),
   idempotencyKey: text('idempotency_key').notNull(),
   methodDisbursementId: text('method_disbursement_id'),
+  receiptEmailPayload: jsonb('receipt_email_payload').$type<{ to: string; subject: string; body: string; taxNotice: string }>(),
   status: transactionStatus('status').default('pending').notNull(),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

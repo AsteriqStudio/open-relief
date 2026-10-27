@@ -10,6 +10,9 @@ import { RecipientScreen } from './src/RecipientScreen';
 import { DonorScreen } from './src/DonorScreen';
 import { AuthProvider, useAuth } from './src/AuthContext';
 import { AuthScreen } from './src/AuthScreen';
+import { StripeProvider } from '@stripe/stripe-react-native';
+
+const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
 function SignedInApp() {
   const auth = useAuth();
@@ -31,5 +34,8 @@ function SignedInApp() {
 }
 
 export default function App() {
-  return <AuthProvider><SignedInApp /></AuthProvider>;
+  const content = <AuthProvider><SignedInApp /></AuthProvider>;
+  return stripePublishableKey?.startsWith('pk_test_')
+    ? <StripeProvider publishableKey={stripePublishableKey}>{content}</StripeProvider>
+    : content;
 }

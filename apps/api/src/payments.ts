@@ -22,12 +22,17 @@ export interface PaymentIntent {
 
 export interface IStripePaymentsClient {
   createIntent(amountCents: number, metadata: Record<string, string>, idempotencyKey: string): Promise<PaymentIntent>;
+  getIntent(id: string): Promise<PaymentIntent>;
 }
 
 export class MockStripePaymentsClient implements IStripePaymentsClient {
   async createIntent(amountCents: number, metadata: Record<string, string>, idempotencyKey: string): Promise<PaymentIntent> {
     const id = `pi_mock_${idempotencyKey.replaceAll('-', '')}`;
     return { id, clientSecret: `${id}_secret_sandbox_only`, amountCents, metadata };
+  }
+  async getIntent(id: string): Promise<PaymentIntent> {
+    if (!id.startsWith('pi_mock_')) throw new Error('Unknown mock payment intent');
+    return { id, clientSecret: `${id}_secret_sandbox_only`, amountCents: 0, metadata: {} };
   }
 }
 
@@ -54,10 +59,12 @@ export async function createDonationIntent(input: z.infer<typeof CreateIntentSch
   return services.db.transaction(async (tx) => {
     const [existing] = await tx.select().from(transactions).where(eq(transactions.idempotencyKey, request.idempotencyKey));
     if (existing) {
-      if (existing.billId !== request.billId || existing.donorId !== request.donorId || existing.amountToBillCents !== request.billAmountCents || existing.totalChargeCents !== split.totalChargeCents) {
+      if (existing.billId !== request.billId || existing.donorId !== request.donorId || existing.amountToBillCents !== request.billAmountCents || existing.totalChargeCents !== split.totalChargeCents || existing.processingFeeCoveredCents !== split.processingFeeCoveredCents || existing.platformTipCents !== split.platformTipCents) {
         throw new Error('Idempotency key already belongs to a different donation');
       }
-      return { transactionId: existing.id, paymentIntentId: existing.stripePaymentIntentId, clientSecret: `${existing.stripePaymentIntentId}_secret_sandbox_only`, split, expiresAt: existing.expiresAt.toISOString() };
+      if (!existing.stripePaymentIntentId) throw new Error('Stored intent is missing');
+      const intent = await stripe.getIntent(existing.stripePaymentIntentId);
+      return { transactionId: existing.id, paymentIntentId: intent.id, clientSecret: intent.clientSecret, split, feeBreakdown: split, expiresAt: existing.expiresAt.toISOString() };
     }
     const [donor] = await tx.select({ id: users.id }).from(users).where(and(eq(users.id, request.donorId), eq(users.role, 'donor')));
     if (!donor) throw new Error('Donor not found');
@@ -76,14 +83,18 @@ export async function createDonationIntent(input: z.infer<typeof CreateIntentSch
       billId: bill.id,
       donorId: donor.id,
       transactionId,
-      amountToBillCents: String(request.billAmountCents),
+      billAmountCents: String(request.billAmountCents),
       processingFeeCoveredCents: String(split.processingFeeCoveredCents),
       platformTipCents: String(split.platformTipCents),
     };
     const intent = await stripe.createIntent(split.totalChargeCents, metadata, request.idempotencyKey);
+    const persistedTransactionId = z.string().uuid().parse(intent.metadata.transactionId);
+    if (intent.amountCents !== split.totalChargeCents || intent.metadata.billId !== bill.id || intent.metadata.donorId !== donor.id || intent.metadata.billAmountCents !== String(request.billAmountCents) || intent.metadata.processingFeeCoveredCents !== String(split.processingFeeCoveredCents) || intent.metadata.platformTipCents !== String(split.platformTipCents)) {
+      throw new Error('Payment intent does not match the donation');
+    }
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
     await tx.insert(transactions).values({
-      id: transactionId,
+      id: persistedTransactionId,
       billId: bill.id,
       donorId: donor.id,
       idempotencyKey: request.idempotencyKey,
@@ -96,7 +107,7 @@ export async function createDonationIntent(input: z.infer<typeof CreateIntentSch
       stripePaymentIntentId: intent.id,
       expiresAt,
     });
-    return { transactionId, paymentIntentId: intent.id, clientSecret: intent.clientSecret, split, expiresAt: expiresAt.toISOString(), metadata };
+    return { transactionId: persistedTransactionId, paymentIntentId: intent.id, clientSecret: intent.clientSecret, split, feeBreakdown: split, expiresAt: expiresAt.toISOString(), metadata: intent.metadata };
   });
 }
 
@@ -122,12 +133,26 @@ export function verifyMockStripeEvent(payload: Buffer, signature: string, secret
   return MockStripeEventSchema.parse(JSON.parse(payload.toString('utf8')));
 }
 
-export async function settleMockPayment(intentId: string, services: Services, method: IMethodBillerClient = new MockMethodBillerClient()) {
+export interface VerifiedPaymentDetails {
+  amountReceivedCents: number;
+  chargeId: string;
+  metadata: Record<string, string>;
+}
+
+export async function settlePayment(intentId: string, services: Services, method: IMethodBillerClient = new MockMethodBillerClient(), verified?: VerifiedPaymentDetails) {
   return services.db.transaction(async (tx) => {
     const [transaction] = await tx.select().from(transactions).where(eq(transactions.stripePaymentIntentId, intentId)).for('update');
     if (!transaction) throw new Error('Unknown payment intent');
+    if (verified) {
+      const metadata = verified.metadata;
+      if (transaction.totalChargeCents !== verified.amountReceivedCents || metadata.billId !== transaction.billId || metadata.donorId !== transaction.donorId || metadata.transactionId !== transaction.id || metadata.billAmountCents !== String(transaction.amountToBillCents) || metadata.processingFeeCoveredCents !== String(transaction.processingFeeCoveredCents) || metadata.platformTipCents !== String(transaction.platformTipCents)) {
+        throw new Error('Stripe payment does not match the reserved donation');
+      }
+    } else if (!intentId.startsWith('pi_mock_')) {
+      throw new Error('A verified Stripe payment event is required');
+    }
     if (transaction.status === 'succeeded') return { transactionId: transaction.id, alreadyProcessed: true };
-    if (transaction.status !== 'pending' || transaction.expiresAt < new Date()) throw new Error('Payment intent is not active');
+    if (transaction.status !== 'pending' || (!verified && transaction.expiresAt < new Date())) throw new Error('Payment intent is not active');
     const [bill] = await tx.select().from(bills).where(eq(bills.id, transaction.billId)).for('update');
     if (!bill?.billerMerchantId || !bill.billerAccountEncrypted || bill.remainingBalanceCents === null || bill.remainingBalanceCents < transaction.amountToBillCents) {
       throw new Error('Bill cannot be settled');
@@ -139,18 +164,32 @@ export async function settleMockPayment(intentId: string, services: Services, me
       idempotencyKey: transaction.id,
     });
     const remainingBalanceCents = bill.remainingBalanceCents - transaction.amountToBillCents;
+    const [donor] = await tx.select({ email: users.email }).from(users).where(eq(users.id, transaction.donorId));
+    if (!donor) throw new Error('Donor not found');
+    const taxNotice = 'This direct bill payment is not represented as a tax-deductible charitable contribution. No 501(c)(3) status is claimed.';
+    const receiptEmailPayload = {
+      to: donor.email,
+      subject: 'Open Relief payment confirmation',
+      body: `Payment confirmation for ${bill.billerName ?? 'a demo creditor'} on ${new Date().toISOString()}. Amount directed to bill: $${(transaction.amountToBillCents / 100).toFixed(2)}. Total test charge: $${(transaction.totalChargeCents / 100).toFixed(2)}. Creditor payment reference: ${methodDisbursementId}. ${taxNotice}`,
+      taxNotice,
+    };
     await tx.update(bills).set({
       remainingBalanceCents,
       status: remainingBalanceCents === 0 ? 'settled' : 'funded',
+      settledAt: remainingBalanceCents === 0 ? new Date() : null,
       updatedAt: new Date(),
     }).where(eq(bills.id, bill.id));
-    await tx.update(transactions).set({ methodDisbursementId, status: 'succeeded', updatedAt: new Date() }).where(eq(transactions.id, transaction.id));
+    await tx.update(transactions).set({ methodDisbursementId, stripeChargeId: verified?.chargeId ?? null, receiptEmailPayload, status: 'succeeded', updatedAt: new Date() }).where(eq(transactions.id, transaction.id));
     await tx.insert(auditLogs).values({
-      id: randomUUID(), eventType: 'bill.mock_settled', actorId: transaction.donorId, billId: bill.id, transactionId: transaction.id,
-      metadata: { amountToBillCents: transaction.amountToBillCents, methodDisbursementId },
+      id: randomUUID(), eventType: verified ? 'bill.sandbox_settled' : 'bill.mock_settled', actorId: transaction.donorId, billId: bill.id, transactionId: transaction.id,
+      metadata: { amountToBillCents: transaction.amountToBillCents, methodDisbursementId, stripeChargeId: verified?.chargeId ?? null },
     });
-    return { transactionId: transaction.id, alreadyProcessed: false, remainingBalanceCents };
+    return { transactionId: transaction.id, alreadyProcessed: false, remainingBalanceCents, receiptEmailPayload };
   });
+}
+
+export async function settleMockPayment(intentId: string, services: Services, method: IMethodBillerClient = new MockMethodBillerClient()) {
+  return settlePayment(intentId, services, method);
 }
 
 export async function failMockPayment(intentId: string, services: Services) {

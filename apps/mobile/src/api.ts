@@ -15,6 +15,15 @@ const BillSchema = z.object({
 
 export type FeedBill = z.infer<typeof BillSchema>;
 const AuthUserSchema = z.object({ id: z.string().uuid(), role: z.enum(['recipient', 'donor', 'admin']), email: z.string().email() });
+const FeeBreakdownSchema = z.object({
+  totalChargeCents: z.number().int(), netPaymentToBillerCents: z.number().int(), stripeFeeCents: z.number().int(),
+  processingFeeCoveredCents: z.number().int(), platformTipCents: z.number().int(), netPlatformTipCents: z.number().int(),
+});
+const DonationIntentSchema = z.object({
+  transactionId: z.string().uuid(), paymentIntentId: z.string().min(1), clientSecret: z.string().min(1),
+  feeBreakdown: FeeBreakdownSchema, mode: z.enum(['mock', 'test']),
+});
+export type DonationIntent = z.infer<typeof DonationIntentSchema>;
 const SessionSchema = z.object({ token: z.string().min(1), expiresAt: z.string().datetime(), user: AuthUserSchema });
 export type AuthUser = z.infer<typeof AuthUserSchema>;
 export type AuthSession = z.infer<typeof SessionSchema>;
@@ -82,17 +91,19 @@ export async function getBillStatus(id: string, token: string): Promise<'pending
   return z.object({ status: z.enum(['pending_ocr', 'verified', 'funded', 'settled', 'rejected']) }).parse(await request(`/api/bills/${id}`, undefined, token)).status;
 }
 
-export async function simulateDonation(input: {
+export async function createDonationIntent(input: {
   billId: string;
-  billAmountCents: number;
+  amountCents: number;
   coverProcessingFee: boolean;
   tipPercentage: number;
-}, token: string): Promise<string> {
-  const result = z.object({ transactionId: z.string().uuid(), mode: z.literal('mock') }).parse(await request('/api/donations/create-intent', {
+}, token: string): Promise<DonationIntent> {
+  return DonationIntentSchema.parse(await request('/api/donations/create-intent', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...input, idempotencyKey: randomUUID() }),
   }, token));
-  await request(`/api/demo/donations/${result.transactionId}/complete`, { method: 'POST' }, token);
-  return result.transactionId;
+}
+
+export async function completeMockDonation(transactionId: string, token: string): Promise<void> {
+  await request(`/api/demo/donations/${transactionId}/complete`, { method: 'POST' }, token);
 }

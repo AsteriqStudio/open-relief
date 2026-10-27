@@ -82,7 +82,7 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     assert.ok(feed.bills.some((bill) => bill.id === billId));
 
     const intentResponse = await app.inject({ method: 'POST', url: '/api/donations/create-intent', headers: donorHeaders, payload: {
-      billId, billAmountCents: 12_000, coverProcessingFee: true, tipPercentage: 0, idempotencyKey: randomUUID(),
+      billId, amountCents: 12_000, coverProcessingFee: true, tipPercentage: 0, idempotencyKey: randomUUID(),
     } });
     assert.equal(intentResponse.statusCode, 201, intentResponse.body);
     const intent = intentResponse.json<{ transactionId: string; paymentIntentId: string; mode: string }>();
@@ -101,7 +101,7 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     assert.equal(settled.remainingBalanceCents, 0);
     const receipt = await app.inject({ method: 'GET', url: `/api/donations/${intent.transactionId}/receipt`, headers: donorHeaders });
     assert.equal(receipt.statusCode, 200);
-    assert.match(receipt.json<{ taxNotice: string }>().taxNotice, /does not establish/);
+    assert.match(receipt.json<{ taxNotice: string }>().taxNotice, /not represented as a tax-deductible/);
 
     const duplicateId = await submit();
     let duplicateStatus = 'pending_ocr';

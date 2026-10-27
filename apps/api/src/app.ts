@@ -4,10 +4,11 @@ import { randomUUID } from 'node:crypto';
 import { desc, eq, inArray } from 'drizzle-orm';
 import Fastify from 'fastify';
 import { z, ZodError } from 'zod';
-import { bills, transactions } from '@open-relief/db';
+import { bills } from '@open-relief/db';
 import { registerAuth } from './auth.js';
-import { CreateIntentSchema, createDonationIntent, failMockPayment, settleMockPayment, verifyMockStripeEvent } from './payments.js';
+import { registerDonationRoutes } from './routes/donations.js';
 import type { Services } from './services.js';
+import { handleVerifiedStripeEvent, verifyStripeWebhook } from './webhooks/stripe.js';
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -114,57 +115,18 @@ export function buildApp(services: Services) {
     return { bills: rows };
   });
 
-  app.post('/api/donations/create-intent', { preHandler: requireAuth({ roles: ['donor'] }) }, async (request, reply) => {
-    const input = CreateIntentSchema.omit({ donorId: true }).parse(request.body);
-    const result = await createDonationIntent({ ...input, donorId: request.user!.id }, services);
-    return reply.code(201).send({ ...result, mode: 'mock' });
-  });
+  registerDonationRoutes(app, services, requireAuth);
 
   app.post('/api/webhooks/stripe', async (request, reply) => {
     const signature = request.headers['stripe-signature'];
     if (typeof signature !== 'string' || !request.rawBody) return reply.code(400).send({ error: 'Missing webhook signature' });
     let event;
     try {
-      event = verifyMockStripeEvent(request.rawBody, signature, services.config.MOCK_STRIPE_WEBHOOK_SECRET);
+      event = verifyStripeWebhook(request.rawBody, signature, services.config);
     } catch {
       return reply.code(400).send({ error: 'Invalid webhook signature or event' });
     }
-    if (event.type === 'payment_intent.payment_failed') {
-      await failMockPayment(event.data.object.id, services);
-      return { received: true };
-    }
-    return { received: true, settlement: await settleMockPayment(event.data.object.id, services) };
-  });
-
-  app.post('/api/demo/donations/:id/complete', { preHandler: requireAuth({ roles: ['donor'] }) }, async (request, reply) => {
-    const { id } = BillIdSchema.parse(request.params);
-    const [transaction] = await services.db.select({ paymentIntentId: transactions.stripePaymentIntentId, donorId: transactions.donorId }).from(transactions).where(eq(transactions.id, id));
-    if (!transaction?.paymentIntentId) return reply.code(404).send({ error: 'Mock donation not found' });
-    if (transaction.donorId !== request.user!.id) return reply.code(403).send({ error: 'Donation belongs to another donor' });
-    return { mode: 'mock', settlement: await settleMockPayment(transaction.paymentIntentId, services) };
-  });
-
-  app.get('/api/donations/:id/receipt', { preHandler: requireAuth({ roles: ['donor', 'admin'] }) }, async (request, reply) => {
-    const { id } = BillIdSchema.parse(request.params);
-    const [row] = await services.db.select({
-      id: transactions.id,
-      donorId: transactions.donorId,
-      status: transactions.status,
-      amountToBillCents: transactions.amountToBillCents,
-      totalChargeCents: transactions.totalChargeCents,
-      processingFeeCoveredCents: transactions.processingFeeCoveredCents,
-      platformTipCents: transactions.platformTipCents,
-      methodDisbursementId: transactions.methodDisbursementId,
-      billerName: bills.billerName,
-      createdAt: transactions.createdAt,
-    }).from(transactions).innerJoin(bills, eq(transactions.billId, bills.id)).where(eq(transactions.id, id));
-    if (!row || row.status !== 'succeeded') return reply.code(404).send({ error: 'Settled donation not found' });
-    if (row.donorId !== request.user!.id && request.user!.role !== 'admin') return reply.code(403).send({ error: 'Receipt belongs to another donor' });
-    return {
-      ...row,
-      mode: 'mock',
-      taxNotice: 'This demo receipt does not establish a tax-deductible charitable contribution.',
-    };
+    return handleVerifiedStripeEvent(event, services);
   });
 
   return app;

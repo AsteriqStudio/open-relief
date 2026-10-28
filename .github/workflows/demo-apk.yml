@@ -73,14 +73,14 @@ jobs:
       - name: Publish labeled prerelease
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: phase11-demo-rc2
-          name: Open Relief offline demo RC2 · obsidian/emerald redesign
+          tag_name: phase11-demo-rc3
+          name: Open Relief full-flow offline walkthrough RC3
           prerelease: true
           make_latest: false
           body: |
-            Fictional offline pitch simulation. No charges, disbursements, verified creditor payments, or charitable tax receipts occur in this APK.
-            Built with an embedded JavaScript bundle and demo signing key for Android sideloading. It is not approved for public financial use.
-            If RC1 is already installed, uninstall it before installing RC2 because the temporary demo signing certificate may differ between CI builds.
+            Four-tab offline walkthrough: donor deck and checkout, fictional recipient intake, local sample review queue, activity dashboard, and legal drafts. Seven fictional bills cover electric, water, gas, medical, and telecom categories.
+            No charge, document upload, OCR, verified creditor decision, disbursement, or charitable tax receipt occurs in this APK. The connected sandbox requires a separate API environment.
+            Built with an embedded JavaScript bundle and demo signing key for Android sideloading. If Android rejects an update because of a signing mismatch, uninstall the prior demo before installing RC3; local demo state will reset.
           files: |
             builds/open-relief-demo.apk
             builds/open-relief-demo.apk.sha256

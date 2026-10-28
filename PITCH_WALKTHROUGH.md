@@ -1,22 +1,26 @@
-# Open Relief: three-minute co-founder demo
+# Open Relief: full-flow offline phone walkthrough
 
-This walkthrough uses the **offline pitch APK**. Every account, household, match pool, and payment confirmation in it is fictional. It makes no charge or transfer and needs no login or network. The US API sandbox is a separate workflow; the European cards illustrate a proposed interface only.
+This walkthrough uses the **RC3 offline APK**. Its bottom navigation opens **Give**, **Need help**, **Review**, and **Profile**. Every account, household, sample submission, match pool, review decision, and payment confirmation in it is fictional. It makes no charge or transfer and needs no login or network. The connected US API sandbox is a separate workflow; the European cards illustrate a proposed interface only.
 
 ## Before handing over the phone
 
-Install `builds/open-relief-demo.apk` on an Android phone with sideloading enabled. Launch **open-relief**. The opening badge should read **OFFLINE PITCH DEMO**. Tap **Reset demo balances** if a previous walkthrough changed them. The release build embeds its JavaScript bundle and pitch cards; it should open in airplane mode. No live Stripe or Method credentials are needed.
+Install `builds/open-relief-demo.apk` on an Android phone with sideloading enabled. Launch **open-relief**. The opening badge should read **OFFLINE PITCH DEMO**, with four tabs at the bottom. Use **Profile → Reset walkthrough** if a previous session changed the sample data. The release build embeds its JavaScript bundle and fictional cards; it should open in airplane mode. No live Stripe or Method credentials are needed.
 
-## Minute 1 — The person and the bill
+## Minute 1 — Explore the fictional bill deck
 
-Hand over the phone. The Detroit DTE Energy **demo** card shows a $142.50 past-due balance and a 48-hour shut-off story. Have your partner swipe left to the Berlin Stadtwerke **demo** card, showing €118.00 and a *Mahnung / Sperrandrohung* story. The sponsor chips are fictional 1:1 examples. Point to the **FICTIONAL PITCH CARD** label and the creditor account last four digits: real launch cards would require document, account, and creditor verification before donors can pay them. The German card is a SEPA creditor-reference **concept**, with no EU transfer implemented.
+Open **Give**. The Detroit DTE Energy **demo** card shows a $142.50 past-due balance and a 48-hour shut-off story. Use the category chips to show electric, water, gas, medical, and telecom examples. Two German cards display EUR and a SEPA creditor-reference **concept**, with no EU transfer implemented. The sponsor chips are fictional 1:1 examples. Point to the **FICTIONAL PITCH CARD** label: a live donor feed would require document, account, and creditor verification.
 
-## Minute 2 — The contribution
+## Minute 2 — Try recipient intake and review
 
-Return to the Detroit card by swiping through the deck, then swipe right or tap **Relieve this bill**. The sponsor card opens at 50% so the 1:1 match can cover the other half. Try 25%, 50%, or 100%; toggle estimated processing coverage; select 0%, 10%, 15%, or 20% optional tip. A full donor gift leaves no bill balance for matching. The split shows the donor principal, fictional sponsor match, illustrative creditor total, and donor total. Accept the simulation notice and tap **Simulate direct creditor payment**. The confirmation shows the local balance drop. This is an in-memory demonstration, so it does not invoke PaymentSheet, biometrics, Stripe, Method, or a bank. The production flow still needs provider and creditor validation.
+Open **Need help**. The form is prefilled with fictional values; edit them, tick the sample-only consent, and tap **Submit sample for review**. No real bill should be entered: this APK does not upload documents or run OCR. Open **Review**, inspect the sample fields, add a decision note, and choose **Add fictional card to deck**. Return to **Give** to see the approved sample card. The review decision is local and does not verify a creditor.
 
-## Minute 3 — Economics and controls
+## Minute 3 — Simulate a contribution
 
-Explain the intended model: donors direct principal toward vetted institutional creditors; a fictional sponsor can match that principal and cover processing from a separately funded, controlled program. The approved sandbox fee calculation estimates 2.9% + $0.30 card processing and lets donors choose a tip. A separate 15% B2B sponsor retainer has been modeled but is not invoiced or collected. The platform has no recipient cash-out flow. Open the unmatched Spectrum card to show the standard community path. Reset the balances before the next demo.
+On **Give**, swipe right or tap **Relieve this bill**. A sponsor card opens at 50% so a fictional 1:1 match can cover the other half. Try 25%, 50%, or 100%; toggle estimated processing coverage; select 0%, 10%, 15%, or 20% optional tip. The split shows the donor principal, fictional match, illustrative creditor total, and donor total. Accept the notice and tap **Simulate creditor payment**. The confirmation shows the local balance drop. This in-memory action does not invoke PaymentSheet, biometrics, Stripe, Method, or a bank.
+
+## Minute 4 — Activity, legal terms, and controls
+
+Open **Profile** to see only the gifts and balances simulated in the current session. USD and EUR totals remain separate. Open the payment, terms, and privacy drafts. Explain the intended model: donors direct principal toward vetted institutional creditors; a fictional sponsor can match principal and cover processing from a separately funded, controlled program. The approved sandbox fee calculation estimates 2.9% + $0.30 card processing and lets donors choose a tip. A separate 15% B2B sponsor retainer has been modeled but is not invoiced or collected. The platform has no recipient cash-out flow. Reset the walkthrough before the next demo.
 
 Avoid presenting the simulated confirmation as a payment receipt or a charitable tax receipt. The existing sandbox confirmation explicitly says direct gifts are not automatically tax deductible.
 
@@ -32,4 +36,4 @@ Avoid presenting the simulated confirmation as a payment receipt or a charitable
 
 ## Developer commands
 
-From the repository root, `pnpm run seed` migrates the local database and loads US sandbox bills plus all four separate `pitch_demo_cards` fixtures (requires local PostgreSQL and the documented `.env.local`). The four-card offline pitch deck uses the same fixture source, `packages/shared/src/pitchDeck.ts`, and works without database seeding. `pitch_demo_cards` is a presentation table and has no path into donation or settlement. `EXPO_PUBLIC_OFFLINE_DEMO=1` selects the bundled deck for the APK or a local Expo preview; leave that flag unset for the connected application. See `PROGRESS.md` for the latest verification record.
+From the repository root, `pnpm run seed` migrates the local database and loads US sandbox bills plus seven separate `pitch_demo_cards` fixtures (requires local PostgreSQL and the documented `.env.local`). The seven-card offline deck uses the same fixture source, `packages/shared/src/pitchDeck.ts`, and works without database seeding. `pitch_demo_cards` is a presentation table and has no path into donation or settlement. `EXPO_PUBLIC_OFFLINE_DEMO=1` selects the bundled four-tab walkthrough for the APK or a local Expo preview; leave that flag unset for the connected application. See `PROGRESS.md` for the latest verification record.

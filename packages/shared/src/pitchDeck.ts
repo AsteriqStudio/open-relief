@@ -6,7 +6,7 @@ export const PitchCardSchema = z.object({
   billerName: z.string().min(2),
   region: z.enum(['US', 'DE']),
   currency: DemoCurrencySchema,
-  category: z.enum(['electric', 'telecom']),
+  category: z.enum(['electric', 'water', 'gas', 'medical', 'telecom']),
   location: z.string().min(2),
   urgency: z.string().min(2),
   story: z.string().min(2),
@@ -24,6 +24,24 @@ export const PITCH_CARDS: PitchCard[] = z.array(PitchCardSchema).parse([
     id: '00000000-0000-4000-8000-000000000201', billerName: 'DTE Energy (demo)', region: 'US', currency: 'USD', category: 'electric',
     location: 'Detroit, MI', urgency: 'Shut-off scheduled in 48 hours', story: 'A Detroit household needs help keeping the lights on.',
     accountLast4: '0101', balanceCents: 14_250, sponsorName: 'Detroit Community Match (fictional)', matchRatio: 1,
+    railLabel: 'US creditor-payment sandbox',
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000202', billerName: 'Detroit Water (demo)', region: 'US', currency: 'USD', category: 'water',
+    location: 'Detroit, MI', urgency: 'Past-due water notice', story: 'A fictional household needs help with an overdue water bill.',
+    accountLast4: '0102', balanceCents: 8_740, sponsorName: null, matchRatio: 0,
+    railLabel: 'US creditor-payment sandbox',
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000203', billerName: 'Consumers Energy (demo)', region: 'US', currency: 'USD', category: 'gas',
+    location: 'Lansing, MI', urgency: 'Heating shut-off notice', story: 'A fictional household faces an overdue heating bill.',
+    accountLast4: '0103', balanceCents: 17_650, sponsorName: 'Michigan Warmth Match (fictional)', matchRatio: 1,
+    railLabel: 'US creditor-payment sandbox',
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000204', billerName: 'City Hospital (demo)', region: 'US', currency: 'USD', category: 'medical',
+    location: 'Cleveland, OH', urgency: 'Past-due medical balance', story: 'A fictional patient needs help with an essential-care bill.',
+    accountLast4: '0104', balanceCents: 29_800, sponsorName: null, matchRatio: 0,
     railLabel: 'US creditor-payment sandbox',
   },
   {

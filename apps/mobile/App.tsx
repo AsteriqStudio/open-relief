@@ -13,7 +13,7 @@ import { AuthScreen } from './src/AuthScreen';
 import { StripeProvider } from './src/stripeAdapter';
 import { AdminReviewScreen } from './src/AdminReviewScreen';
 import { ProfileScreen } from './src/ProfileScreen';
-import { OfflineDemoScreen } from './src/OfflineDemoScreen';
+import { OfflineDemoApp } from './src/OfflineDemoApp';
 import { BrandHeader, COLORS, ScreenBackdrop } from './src/design';
 
 const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY;
@@ -38,7 +38,7 @@ function SignedInApp() {
 }
 
 export default function App() {
-  if (process.env.EXPO_PUBLIC_OFFLINE_DEMO === '1') return <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider><BottomSheetModalProvider><ScreenBackdrop><SafeAreaView className="flex-1"><StatusBar style="light" backgroundColor={COLORS.backdrop} /><OfflineDemoScreen /></SafeAreaView></ScreenBackdrop></BottomSheetModalProvider></SafeAreaProvider></GestureHandlerRootView>;
+  if (process.env.EXPO_PUBLIC_OFFLINE_DEMO === '1') return <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider><BottomSheetModalProvider><ScreenBackdrop><SafeAreaView className="flex-1"><StatusBar style="light" backgroundColor={COLORS.backdrop} /><OfflineDemoApp /></SafeAreaView></ScreenBackdrop></BottomSheetModalProvider></SafeAreaProvider></GestureHandlerRootView>;
   const content = <AuthProvider><SignedInApp /></AuthProvider>;
   return stripePublishableKey?.startsWith('pk_test_')
     ? <StripeProvider publishableKey={stripePublishableKey}>{content}</StripeProvider>

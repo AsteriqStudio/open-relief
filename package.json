@@ -12,7 +12,7 @@
     "seed": "pnpm --filter @open-relief/shared build && bash scripts/seed-local.sh",
     "typecheck": "pnpm build && tsc -p tsconfig.setup.json --noEmit && pnpm --filter @open-relief/shared typecheck && pnpm --filter @open-relief/db typecheck && pnpm --filter @open-relief/api typecheck && pnpm --filter @open-relief/mobile typecheck",
     "preview:web": "EXPO_NO_TELEMETRY=1 EXPO_OFFLINE=1 pnpm --filter @open-relief/mobile exec expo export --platform web --output-dir dist-web && node --experimental-strip-types scripts/serve-web-preview.ts",
-    "test": "pnpm --filter @open-relief/shared test && pnpm --filter @open-relief/db test && pnpm --filter @open-relief/api test"
+    "test": "pnpm --filter @open-relief/shared test && pnpm --filter @open-relief/db test && pnpm --filter @open-relief/api test && pnpm --filter @open-relief/mobile test"
   },
   "devDependencies": {
     "@types/node": "^24.9.1",

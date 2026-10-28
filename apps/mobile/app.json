@@ -3,7 +3,7 @@
     "name": "open-relief",
     "slug": "open-relief",
     "scheme": "openrelief",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "plugins": ["expo-image-picker", "expo-document-picker", "expo-secure-store", ["@stripe/stripe-react-native", { "merchantIdentifier": "", "enableGooglePay": false }]],
@@ -12,7 +12,7 @@
     },
     "android": {
       "package": "org.openrelief.app",
-      "versionCode": 2
+      "versionCode": 3
     }
   }
 }

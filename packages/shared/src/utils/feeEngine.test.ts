@@ -6,8 +6,9 @@ import { PITCH_CARDS } from '../pitchDeck.js';
 test('offline pitch cards use explicit currencies and fictional rails', () => {
   assert.equal(formatCurrency(14_250), '$142.50');
   assert.equal(formatCurrency(11_800, 'EUR'), '118,00 €');
-  assert.equal(PITCH_CARDS.length, 4);
+  assert.equal(PITCH_CARDS.length, 7);
   assert.equal(PITCH_CARDS.filter((card) => card.currency === 'EUR').length, 2);
+  assert.deepEqual(new Set(PITCH_CARDS.map((card) => card.category)), new Set(['electric', 'water', 'gas', 'medical', 'telecom']));
   assert.ok(PITCH_CARDS.every((card) => card.railLabel.includes('sandbox') || card.railLabel.includes('concept')));
   assert.throws(() => formatCurrency(Number.POSITIVE_INFINITY));
 });

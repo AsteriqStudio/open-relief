@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
-import { useStripe } from '@stripe/stripe-react-native';
+import { useStripe } from './stripeAdapter';
 import * as Haptics from 'expo-haptics';
 import { calculateDonationSplit, donorGiftDisclosure } from '@open-relief/shared';
 import { completeMockDonation, createDonationIntent } from './api';

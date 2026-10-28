@@ -91,9 +91,23 @@ test('admin triage is role guarded, paginated, audited and controls feed visibil
     assert.equal((await app.inject({ method: 'POST', url: `/api/admin/reviews/${approveId}/decision`, headers: donorHeaders, payload: { decision: 'approve', notes: 'looks valid' } })).statusCode, 403);
     assert.equal((await app.inject({ method: 'GET', url: `/api/admin/reviews/${approveId}/document`, headers: donorHeaders })).statusCode, 403);
     assert.equal((await app.inject({ method: 'GET', url: `/api/admin/reviews/${pdfId}/preview`, headers: donorHeaders })).statusCode, 403);
-    const list = await app.inject({ method: 'GET', url: '/api/admin/reviews/pending?page=1&limit=50', headers: adminHeaders });
-    assert.equal(list.statusCode, 200, list.body);
-    const pending = list.json<{ reviews: Array<{ billId: string; nameMatchPercentage: number | null; recipientLegalName: string | null; accountHolderName: string | null }> }>().reviews;
+    type ReviewRow = { billId: string; nameMatchPercentage: number | null; recipientLegalName: string | null; accountHolderName: string | null };
+    const listPending = async (): Promise<ReviewRow[]> => {
+      const rows: ReviewRow[] = [];
+      let page = 1;
+      let total = 0;
+      do {
+        const response = await app.inject({ method: 'GET', url: `/api/admin/reviews/pending?page=${page}&limit=50`, headers: adminHeaders });
+        assert.equal(response.statusCode, 200, response.body);
+        const result = response.json<{ reviews: ReviewRow[]; total: number }>();
+        rows.push(...result.reviews);
+        total = result.total;
+        if (result.reviews.length === 0) break;
+        page += 1;
+      } while (rows.length < total);
+      return rows;
+    };
+    const pending = await listPending();
     assert.ok(pending.some((row) => row.billId === approveId && row.nameMatchPercentage !== null && row.nameMatchPercentage < 80 && row.recipientLegalName === 'Demo Recipient' && row.accountHolderName === 'Different Person'));
     assert.ok(pending.some((row) => row.billId === rejectId));
     const firstPage = (await app.inject({ method: 'GET', url: '/api/admin/reviews/pending?page=1&limit=1', headers: adminHeaders })).json<{ reviews: unknown[]; total: number; limit: number }>();
@@ -138,7 +152,7 @@ test('admin triage is role guarded, paginated, audited and controls feed visibil
     assert.ok(!feedAfter.some((row) => row.id === rejectId));
     const logs = await services.db.select().from(auditLogs).where(eq(auditLogs.billId, rejectId));
     assert.equal(logs.filter((row) => row.eventType === 'bill.admin_rejected').length, 1);
-    assert.ok(!((await app.inject({ method: 'GET', url: '/api/admin/reviews/pending?page=1&limit=50', headers: adminHeaders })).json<{ reviews: Array<{ billId: string }> }>().reviews.some((row) => row.billId === approveId || row.billId === rejectId)));
+    assert.ok(!(await listPending()).some((row) => row.billId === approveId || row.billId === rejectId));
   } finally {
     await app.close();
     await services.close();

@@ -24,6 +24,16 @@ EXPO_NO_TELEMETRY=1 EXPO_OFFLINE=1 pnpm --filter @open-relief/mobile start
 
 Set `EXPO_PUBLIC_API_URL` to the API address reachable by your simulator or device. Android emulators usually use `http://10.0.2.2:3000`; iOS simulators can use `http://127.0.0.1:3000`. A physical device needs the host machine's LAN address and an API bind address that permits it.
 
+## Browser preview
+
+With the API running, use `pnpm preview:web` in a second terminal. The command exports the actual Expo UI for web and serves it on loopback port 8081 with a same-origin proxy to the local API. Create a donor account to inspect the seeded bills and try a mock payment. This preview stores its demo session in browser local storage; Stripe PaymentSheet remains native-only, and recipient document upload should be tested in the mobile app.
+
+The captured screens below come from a browser run against the seeded local API:
+
+![Donor feed preview](docs/previews/donor.png)
+
+![Mock checkout preview](docs/previews/checkout.png)
+
 ## Validate
 
 With the local services running and `.env.local` loaded into the shell:
@@ -35,6 +45,7 @@ set +a
 pnpm typecheck
 pnpm test
 EXPO_NO_TELEMETRY=1 EXPO_OFFLINE=1 pnpm --filter @open-relief/mobile export
+EXPO_NO_TELEMETRY=1 EXPO_OFFLINE=1 pnpm --filter @open-relief/mobile exec expo export --platform web
 ```
 
 The end-to-end test uploads a JPEG through the presigned form, checks EXIF removal, waits for mock OCR, rejects a duplicate, creates a mock donation, verifies the webhook signature and replay handling, and confirms the bill is settled. Adapter tests exercise signed Stripe test webhook fixtures, partial and full settlement, fee splits, and Method sandbox routing without external credentials. Vetting and admin tests check eligibility, role guards, approval, rejection, audit records, and feed visibility. Tests create uniquely identified demo data on each run.

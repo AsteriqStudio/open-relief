@@ -10,7 +10,7 @@ import { RecipientScreen } from './src/RecipientScreen';
 import { DonorScreen } from './src/DonorScreen';
 import { AuthProvider, useAuth } from './src/AuthContext';
 import { AuthScreen } from './src/AuthScreen';
-import { StripeProvider } from '@stripe/stripe-react-native';
+import { StripeProvider } from './src/stripeAdapter';
 import { AdminReviewScreen } from './src/AdminReviewScreen';
 import { ProfileScreen } from './src/ProfileScreen';
 

@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { randomUUID } from 'expo-crypto';
+import { Platform } from 'react-native';
 import { LEGAL_TERMS_VERSION } from '@open-relief/shared';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://127.0.0.1:3000';
+const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? (Platform.OS === 'web' ? window.location.origin : 'http://127.0.0.1:3000');
 const BillSchema = z.object({
   id: z.string().uuid(),
   billerName: z.string().nullable(),

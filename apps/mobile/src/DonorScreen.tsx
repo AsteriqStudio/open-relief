@@ -7,6 +7,7 @@ import { useAuth } from './AuthContext';
 import { CheckoutSheet } from './CheckoutSheet';
 import type { CheckoutConfirmation } from './CheckoutSheet';
 import { SwipeableBillCard } from './SwipeableBillCard';
+import { BRAND_NOTICE } from '@open-relief/shared';
 
 const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 const categoryFilters = ['all', 'electric', 'water', 'gas', 'medical', 'telecom'] as const;
@@ -30,7 +31,16 @@ function ImpactCelebration({ confirmation, receipt, onClose }: { confirmation: C
     <Text className="mt-7 text-xs font-bold tracking-widest text-mint">DIRECT-TO-CREDITOR RELIEF</Text>
     <Text className="mt-2 text-3xl font-black text-white">{confirmed ? 'Relief recorded.' : 'Payment received.'}</Text>
     <Text className="mt-4 text-base leading-6 text-white/80">{summary}</Text>
-    {receipt ? <><View className="mt-6 rounded-2xl bg-white/10 p-5"><Text className="text-xs font-bold tracking-widest text-mint">PAYMENT CONFIRMATION</Text><View className="mt-4 flex-row justify-between"><Text className="text-sm text-white/80">Paid to creditor</Text><Text className="font-black text-white">{dollars(receipt.amountToBillCents)}</Text></View><View className="mt-3 flex-row justify-between"><Text className="text-sm text-white/80">Test total</Text><Text className="font-black text-white">{dollars(receipt.totalChargeCents)}</Text></View><Text className="mt-4 text-xs leading-5 text-white/70">{receipt.taxNotice}</Text></View><Pressable accessibilityRole="button" onPress={() => void shareReceipt()} className="mt-5 min-h-14 items-center justify-center rounded-2xl bg-mint"><Text className="font-black text-pine-dark">Share confirmation</Text></Pressable></> : <Text className="mt-5 text-sm text-mint">Creditor confirmation will appear after the signed webhook is recorded.</Text>}
+    {receipt ? <>
+      <View className="mt-6 rounded-2xl bg-white/10 p-5">
+        <Text className="text-xs font-bold tracking-widest text-mint">PAYMENT CONFIRMATION</Text>
+        <View className="mt-4 flex-row justify-between"><Text className="text-sm text-white/80">Paid to creditor</Text><Text className="font-black text-white">{dollars(receipt.amountToBillCents)}</Text></View>
+        <View className="mt-3 flex-row justify-between"><Text className="text-sm text-white/80">Test total</Text><Text className="font-black text-white">{dollars(receipt.totalChargeCents)}</Text></View>
+        <Text className="mt-4 text-xs leading-5 text-white/70">{receipt.taxNotice}</Text>
+        <Text className="mt-3 text-xs leading-5 text-white/70">{BRAND_NOTICE}</Text>
+      </View>
+      <Pressable accessibilityRole="button" onPress={() => void shareReceipt()} className="mt-5 min-h-14 items-center justify-center rounded-2xl bg-mint"><Text className="font-black text-pine-dark">Share confirmation</Text></Pressable>
+    </> : <Text className="mt-5 text-sm text-mint">Creditor confirmation will appear after the signed webhook is recorded.</Text>}
     <Pressable accessibilityRole="button" onPress={onClose} className="mt-4 p-3"><Text className="text-center font-bold text-white/80">Back to bills</Text></Pressable>
   </View></Animated.View>;
 }

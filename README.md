@@ -2,6 +2,8 @@
 
 A local, zero-cash **demo** for direct-to-creditor mutual aid. Recipients submit overdue bills, the mock OCR worker verifies demo billers, and donors simulate a payment that settles against the biller account. Optional Stripe test mode uses test cards and a simulated Method sandbox payment. No live charge, payout, or recipient cash transfer is implemented.
 
+See [PROGRESS.md](PROGRESS.md) for the current implementation, verification results, and remaining approval gates.
+
 ## Run locally
 
 Use Node.js 22 or newer, pnpm 11.25, Docker Compose, and Poppler's `pdftoppm` command for admin PDF previews.
@@ -72,7 +74,7 @@ The donor app has a spring-driven swipe deck with haptics, category filters for 
 
 ## Admin review and legal acceptance
 
-Recipients must name the creditor and accept the versioned attestation before the API issues an upload URL. The API records the acceptance time and version on the bill. Donors must accept the versioned gift disclosure before the API creates a payment intent; the transaction stores that acceptance. The app displays Terms of Service and Privacy Notice modals. These are sandbox legal drafts and need qualified legal review before public use.
+Recipients must name the creditor and accept the versioned attestation before the API issues an upload URL. The API records the acceptance time and version on the bill. Donors must accept the versioned gift disclosure before the API creates a payment intent; the transaction stores that acceptance. Checkout, confirmation, and Profile display the sandbox brand and payment-policy notice. The app also displays Terms of Service and Privacy Notice modals. These are sandbox legal drafts and need qualified legal review before public use. The notice describes agent-of-the-payee agreements as a future requirement and does not claim one exists today.
 
 Admin accounts cannot be created through public signup. For a local admin, provide `ADMIN_EMAIL`, `ADMIN_PASSWORD` (at least 12 characters), and `ADMIN_PHONE` through the local shell or secure environment settings, load `.env.local`, then run `pnpm --filter @open-relief/api bootstrap-admin`. The command refuses to run with `NODE_ENV=production` and refuses to elevate an existing email. Sign in with that account through the mobile app. In development builds, Profile can switch between previously authenticated recipient, donor, and admin accounts; switching verifies the stored session with the server and never changes the account's role.
 

@@ -41,7 +41,8 @@ Update this file when a task changes status. Keep implementation claims tied to 
 - Phase 11: `pnpm run typecheck` passed; `pnpm test` passed all 19 tests; `pnpm run seed` migrated and seeded two USD plus two EUR pitch cards in a separate presentation table.
 - Phase 11 offline Android and web Expo bundles compiled. The Gradle `:app:createBundleReleaseJsAndAssets` task passed locally after adding the explicit Babel JSX plugin dependency.
 - GitHub Actions run `40734730166` succeeded: APK build, artifact upload, and labeled prerelease publication. The downloaded `builds/open-relief-demo.apk` is 89,864,917 bytes, has SHA-256 `68950b06e7d7081813c67cd4e9b777045e723625dd6c930c330d0073b8fc1baf`, contains `assets/index.android.bundle`, and passes `apksigner verify` with the demo signing certificate. Package `org.openrelief.app`, minimum Android SDK 24.
-- Obsidian/emerald redesign: `pnpm run typecheck` passed; `pnpm test` passed all 19 tests with `.env.local` loaded; Android and web Expo exports compiled. A new integration assertion checks authenticated donor impact totals. RC2 native APK build runs in GitHub Actions after push.
+- Obsidian/emerald redesign: `pnpm run typecheck` passed; `pnpm test` passed all 19 tests with `.env.local` loaded; Android and web Expo exports compiled. A new integration assertion checks authenticated donor impact totals.
+- GitHub Actions run `40746601104` succeeded and published `phase11-demo-rc2`. The downloaded RC2 APK is 89,873,289 bytes, SHA-256 `91ccb7e11b427e2819fae8972a332f4a8e6712a99a8d68ba816bbf2998f3914f`, includes `assets/index.android.bundle`, and passes `apksigner verify`. Package `org.openrelief.app`, version code 2, minimum Android SDK 24.
 
 ## Boundaries and next gates
 
@@ -51,4 +52,4 @@ Update this file when a task changes status. Keep implementation claims tied to 
 - The demo has no executed agent-of-the-payee agreement and makes no money-transmitter exemption claim. Legal copy remains a draft for qualified review.
 - Public deployment still needs independently verified creditor routing, payment-provider and legal arrangements, stronger authentication and fraud controls, delivered notifications, and a successful cloud environment publication.
 - The Phase 11 APK is an offline fictional payment simulation. No Android device or emulator was attached here, so on-device launch and gesture checks remain to be done by a human tester. The local workspace could not download React Native AARs through its proxy; the GitHub Actions native build succeeded. The APK uses a demo debug signing certificate and is not a Play Store release.
-- RC2 uses Android version code 2 and a new prerelease tag. GitHub Actions may generate a different temporary demo signing certificate, so RC1 should be uninstalled before installing RC2.
+- RC2 uses Android version code 2 and a new prerelease tag. Its APK signing certificate fingerprint matches RC1 in this build, so Android should allow an in-place update; installation on a physical device remains untested here.

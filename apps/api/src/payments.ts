@@ -76,6 +76,8 @@ export async function createDonationIntent(input: z.infer<typeof CreateIntentSch
   return services.db.transaction(async (tx) => {
     const [existing] = await tx.select().from(transactions).where(eq(transactions.idempotencyKey, request.idempotencyKey));
     if (existing) {
+      const [existingBill] = await tx.select({ countryCode: bills.countryCode }).from(bills).where(eq(bills.id, existing.billId));
+      if (existingBill && existingBill.countryCode !== 'US') throw new UnsupportedMarketError();
       if (existing.billId !== request.billId || existing.donorId !== request.donorId || existing.amountToBillCents !== request.billAmountCents || existing.totalChargeCents !== baseSplit.totalChargeCents || existing.processingFeeCoveredCents !== baseSplit.processingFeeCoveredCents || existing.platformTipCents !== baseSplit.platformTipCents) {
         throw new Error('Idempotency key already belongs to a different donation');
       }

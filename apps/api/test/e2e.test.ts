@@ -112,6 +112,11 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     } });
     assert.equal(intentResponse.statusCode, 201, intentResponse.body);
     const intent = intentResponse.json<{ transactionId: string; paymentIntentId: string; mode: string }>();
+    const [savedIntent] = await services.db.select({ idempotencyKey: transactions.idempotencyKey }).from(transactions).where(eq(transactions.id, intent.transactionId));
+    await services.db.update(bills).set({ countryCode: 'DE' }).where(eq(bills.id, billId));
+    const replayInUnsupportedMarket = await app.inject({ method: 'POST', url: '/api/donations/create-intent', headers: donorHeaders, payload: { billId, amountCents: 12_000, coverProcessingFee: true, tipPercentage: 0, idempotencyKey: savedIntent!.idempotencyKey, donorAcceptance: { accepted: true, termsVersion: 'v1.0' } } });
+    assert.equal(replayInUnsupportedMarket.statusCode, 422, replayInUnsupportedMarket.body);
+    await services.db.update(bills).set({ countryCode: 'US' }).where(eq(bills.id, billId));
     const [acceptedTransaction] = await services.db.select({ acceptedAt: transactions.donorTermsAcceptedAt, version: transactions.donorTermsVersion }).from(transactions).where(eq(transactions.id, intent.transactionId));
     assert.ok(acceptedTransaction?.acceptedAt);
     assert.equal(acceptedTransaction.version, 'v1.0');

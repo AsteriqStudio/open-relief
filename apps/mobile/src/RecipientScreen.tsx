@@ -5,6 +5,9 @@ import * as ImagePicker from 'expo-image-picker';
 import { getBillDetails, uploadBill } from './api';
 import type { FeedBill } from './api';
 import { useAuth } from './AuthContext';
+import { recipientAttestation } from '@open-relief/shared';
+import { LegalModal } from './LegalModal';
+import type { LegalDocument } from './LegalModal';
 
 type SelectedFile = { uri: string; name: string; mimeType: 'image/jpeg' | 'image/png' | 'application/pdf' };
 
@@ -13,6 +16,9 @@ export function RecipientScreen() {
   const [category, setCategory] = useState<FeedBill['category']>('electric');
   const [zipCode, setZipCode] = useState('48201');
   const [story, setStory] = useState('Household needs help with an overdue utility bill');
+  const [declaredBillerName, setDeclaredBillerName] = useState('');
+  const [attestationAccepted, setAttestationAccepted] = useState(false);
+  const [legalDocument, setLegalDocument] = useState<LegalDocument | null>(null);
   const [file, setFile] = useState<SelectedFile | null>(null);
   const [status, setStatus] = useState('Choose a bill document');
   const [busy, setBusy] = useState(false);
@@ -38,11 +44,11 @@ export function RecipientScreen() {
   }
 
   async function submit() {
-    if (!file || !token || busy) return;
+    if (!file || !token || busy || !attestationAccepted || !declaredBillerName.trim()) return;
     setBusy(true);
     try {
       setStatus('Uploaded');
-      const billId = await uploadBill({ ...file, category, zipCode, story }, token);
+      const billId = await uploadBill({ ...file, category, zipCode, story, declaredBillerName: declaredBillerName.trim(), attestationAccepted: true }, token);
       setStatus('Scanning');
       for (let attempt = 0; attempt < 30; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -71,6 +77,8 @@ export function RecipientScreen() {
     </View>
     <Text className="mt-6 font-semibold">ZIP code</Text>
     <TextInput className="mt-2 rounded-xl border border-slate-300 bg-white p-3" keyboardType="number-pad" maxLength={5} value={zipCode} onChangeText={setZipCode} />
+    <Text className="mt-6 font-semibold">Creditor shown on the bill</Text>
+    <TextInput className="mt-2 rounded-xl border border-slate-300 bg-white p-3" placeholder="Utility or hospital name" value={declaredBillerName} onChangeText={(value) => { setDeclaredBillerName(value); setAttestationAccepted(false); }} />
     <Text className="mt-6 font-semibold">Short anonymous story</Text>
     <TextInput className="mt-2 rounded-xl border border-slate-300 bg-white p-3" multiline maxLength={240} value={story} onChangeText={setStory} />
     <View className="mt-6 flex-row gap-3">
@@ -78,7 +86,10 @@ export function RecipientScreen() {
       <Pressable onPress={() => void chooseFile()} className="rounded-xl bg-slate-800 p-3"><Text className="text-white">Choose file</Text></Pressable>
     </View>
     <Text className="mt-3 text-slate-600">{file?.name ?? 'JPEG, PNG, or PDF up to 10 MB'}</Text>
-    <Pressable disabled={!file || busy} onPress={() => void submit()} className={`mt-6 rounded-xl p-4 ${!file || busy ? 'bg-slate-400' : 'bg-teal-700'}`}><Text className="text-center font-semibold text-white">Submit bill</Text></Pressable>
+    <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: attestationAccepted }} onPress={() => setAttestationAccepted((value) => !value)} className="mt-6 flex-row rounded-2xl border border-slate-200 bg-white p-4"><Text className="mr-3 text-xl text-teal-700">{attestationAccepted ? '☑' : '□'}</Text><Text className="flex-1 text-sm leading-5 text-slate-700">{recipientAttestation(declaredBillerName.trim() || 'the creditor shown on my bill')}</Text></Pressable>
+    <View className="mt-3 flex-row gap-5"><Pressable onPress={() => setLegalDocument('terms')}><Text className="font-semibold text-teal-700">Terms of service</Text></Pressable><Pressable onPress={() => setLegalDocument('privacy')}><Text className="font-semibold text-teal-700">Privacy notice</Text></Pressable></View>
+    <Pressable disabled={!file || busy || !attestationAccepted || !declaredBillerName.trim()} onPress={() => void submit()} className={`mt-6 rounded-xl p-4 ${!file || busy || !attestationAccepted || !declaredBillerName.trim() ? 'bg-slate-400' : 'bg-teal-700'}`}><Text className="text-center font-semibold text-white">Submit bill</Text></Pressable>
     <View className="mt-6 rounded-xl bg-white p-4"><Text className="font-semibold">Status tracker</Text><Text className="mt-2 text-slate-700">Uploaded → Scanning → Verified → Funded → Paid</Text><Text className="mt-2 text-teal-700">{status}</Text>{busy && <ActivityIndicator className="mt-3" />}</View>
+    <LegalModal document={legalDocument} onClose={() => setLegalDocument(null)} />
   </ScrollView>;
 }

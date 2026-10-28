@@ -11,23 +11,25 @@ import { DonorScreen } from './src/DonorScreen';
 import { AuthProvider, useAuth } from './src/AuthContext';
 import { AuthScreen } from './src/AuthScreen';
 import { StripeProvider } from '@stripe/stripe-react-native';
+import { AdminReviewScreen } from './src/AdminReviewScreen';
+import { ProfileScreen } from './src/ProfileScreen';
 
 const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
 function SignedInApp() {
   const auth = useAuth();
-  const [tab, setTab] = useState<'need' | 'give'>('give');
+  const [tab, setTab] = useState<'main' | 'profile'>('main');
   if (auth.loading) return <ActivityIndicator style={{ flex: 1 }} />;
   if (!auth.user) return <AuthScreen />;
-  const activeTab = auth.user.role === 'recipient' ? 'need' : auth.user.role === 'donor' ? 'give' : tab;
+  const mainLabel = auth.user.role === 'recipient' ? 'Need Help' : auth.user.role === 'donor' ? 'Give Help' : 'Admin Review';
   return <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaProvider><BottomSheetModalProvider><SafeAreaView className="flex-1 bg-slate-50">
       <StatusBar style="dark" />
-      <View className="flex-row items-center justify-between px-5 py-2"><Text className="text-slate-600">{auth.user.email}</Text><Pressable onPress={() => void auth.signOut()}><Text className="font-semibold text-teal-700">Sign out</Text></Pressable></View>
-      {activeTab === 'need' ? <RecipientScreen /> : <DonorScreen />}
+      <View className="flex-row items-center justify-between px-5 py-2"><Text className="text-slate-600">{auth.user.email}</Text><Text className="font-semibold capitalize text-teal-700">{auth.user.role}</Text></View>
+      {tab === 'profile' ? <ProfileScreen /> : auth.user.role === 'recipient' ? <RecipientScreen /> : auth.user.role === 'donor' ? <DonorScreen /> : <AdminReviewScreen />}
       <View className="flex-row border-t border-slate-200 bg-white">
-        <Pressable disabled={auth.user.role === 'donor'} onPress={() => setTab('need')} className="flex-1 p-4"><Text className={`text-center font-semibold ${activeTab === 'need' ? 'text-teal-700' : 'text-slate-500'}`}>Need Help</Text></Pressable>
-        <Pressable disabled={auth.user.role === 'recipient'} onPress={() => setTab('give')} className="flex-1 p-4"><Text className={`text-center font-semibold ${activeTab === 'give' ? 'text-teal-700' : 'text-slate-500'}`}>Give Help</Text></Pressable>
+        <Pressable onPress={() => setTab('main')} className="flex-1 p-4"><Text className={`text-center font-semibold ${tab === 'main' ? 'text-teal-700' : 'text-slate-500'}`}>{mainLabel}</Text></Pressable>
+        <Pressable onPress={() => setTab('profile')} className="flex-1 p-4"><Text className={`text-center font-semibold ${tab === 'profile' ? 'text-teal-700' : 'text-slate-500'}`}>Profile</Text></Pressable>
       </View>
     </SafeAreaView></BottomSheetModalProvider></SafeAreaProvider>
   </GestureHandlerRootView>;

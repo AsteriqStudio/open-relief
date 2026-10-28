@@ -46,7 +46,7 @@ function derivePassword(password: string, salt: Buffer): Promise<Buffer> {
   });
 }
 
-async function hashPassword(password: string): Promise<string> {
+export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16);
   const derived = await derivePassword(password, salt);
   return `scrypt:32768:${salt.toString('hex')}:${derived.toString('hex')}`;

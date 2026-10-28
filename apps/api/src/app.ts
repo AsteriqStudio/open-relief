@@ -1,31 +1,15 @@
-import { HeadObjectCommand } from '@aws-sdk/client-s3';
-import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
-import { randomUUID } from 'node:crypto';
-import { desc, eq, inArray } from 'drizzle-orm';
 import Fastify from 'fastify';
-import { z, ZodError } from 'zod';
-import { bills } from '@open-relief/db';
-import { decryptAccountNumber } from '@open-relief/db/security/encryption';
+import { ZodError } from 'zod';
 import { registerAuth } from './auth.js';
+import { registerAdminRoutes } from './routes/admin.js';
+import { registerBillRoutes } from './routes/bills.js';
 import { registerDonationRoutes } from './routes/donations.js';
 import type { Services } from './services.js';
 import { handleVerifiedStripeEvent, verifyStripeWebhook } from './webhooks/stripe.js';
 
 declare module 'fastify' {
-  interface FastifyRequest {
-    rawBody?: Buffer;
-  }
+  interface FastifyRequest { rawBody?: Buffer }
 }
-
-const MAX_BYTES = 10 * 1024 * 1024;
-const UploadRequestSchema = z.object({
-  category: z.enum(['electric', 'water', 'gas', 'medical']),
-  mimeType: z.enum(['image/jpeg', 'image/png', 'application/pdf']),
-  sizeBytes: z.number().int().positive().max(MAX_BYTES),
-  zipCode: z.string().regex(/^\d{5}$/),
-  story: z.string().min(1).max(240),
-}).strict();
-const BillIdSchema = z.object({ id: z.string().uuid() });
 
 export function buildApp(services: Services) {
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
@@ -53,86 +37,16 @@ export function buildApp(services: Services) {
   });
 
   app.get('/health', async () => ({ status: 'ok' }));
-
-  app.post('/api/bills/upload-url', { preHandler: requireAuth({ roles: ['recipient'] }) }, async (request, reply) => {
-    const input = UploadRequestSchema.parse(request.body);
-    const billId = randomUUID();
-    const key = `bills/${billId}/original`;
-    const post = await createPresignedPost(services.s3, {
-      Bucket: services.config.S3_BUCKET,
-      Key: key,
-      Expires: 300,
-      Fields: { 'Content-Type': input.mimeType },
-      Conditions: [['content-length-range', 1, MAX_BYTES], ['eq', '$Content-Type', input.mimeType]],
-    });
-    await services.db.insert(bills).values({
-      id: billId,
-      recipientId: request.user!.id,
-      category: input.category,
-      documentUrl: `s3://${services.config.S3_BUCKET}/${key}`,
-      documentKey: key,
-      documentMimeType: input.mimeType,
-      documentSizeBytes: input.sizeBytes,
-      zipCode: input.zipCode,
-      story: input.story,
-    });
-    return reply.code(201).send({ billId, url: post.url, fields: post.fields, expiresInSeconds: 300 });
-  });
-
-  app.post('/api/bills/:id/complete', { preHandler: requireAuth({ roles: ['recipient'] }) }, async (request, reply) => {
-    const { id } = BillIdSchema.parse(request.params);
-    const [bill] = await services.db.select().from(bills).where(eq(bills.id, id));
-    if (!bill) return reply.code(404).send({ error: 'Bill not found' });
-    if (bill.recipientId !== request.user!.id) return reply.code(403).send({ error: 'Bill belongs to another recipient' });
-    if (bill.status !== 'pending_ocr') return reply.code(409).send({ error: 'Bill is not awaiting OCR' });
-    const metadata = await services.s3.send(new HeadObjectCommand({ Bucket: services.config.S3_BUCKET, Key: `bills/${id}/original` }));
-    if (!metadata.ContentLength || metadata.ContentLength > MAX_BYTES || metadata.ContentType !== bill.documentMimeType) {
-      return reply.code(400).send({ error: 'Uploaded document does not match the declared file' });
-    }
-    await services.queue.add('process', { billId: id }, { jobId: id, attempts: 3, backoff: { type: 'exponential', delay: 1000 } });
-    return reply.code(202).send({ billId: id, status: 'scanning' });
-  });
-
-  app.get('/api/bills/:id', { preHandler: requireAuth() }, async (request, reply) => {
-    const { id } = BillIdSchema.parse(request.params);
-    const [bill] = await services.db.select({ id: bills.id, recipientId: bills.recipientId, status: bills.status, remainingBalanceCents: bills.remainingBalanceCents, rejectionReason: bills.rejectionReason }).from(bills).where(eq(bills.id, id));
-    if (!bill || ((bill.status === 'pending_ocr' || bill.status === 'pending_review' || bill.status === 'rejected') && bill.recipientId !== request.user!.id && request.user!.role !== 'admin')) {
-      return reply.code(404).send({ error: 'Bill not found' });
-    }
-    return { id: bill.id, status: bill.status, remainingBalanceCents: bill.remainingBalanceCents, rejectionReason: bill.recipientId === request.user!.id || request.user!.role === 'admin' ? bill.rejectionReason : null };
-  });
-
-  app.get('/api/bills/feed', async () => {
-    const rows = await services.db.select({
-      id: bills.id,
-      billerName: bills.billerName,
-      category: bills.category,
-      zipCode: bills.zipCode,
-      story: bills.story,
-      statementBalanceCents: bills.statementBalanceCents,
-      remainingBalanceCents: bills.remainingBalanceCents,
-      status: bills.status,
-      isShutoffNotice: bills.isShutoffNotice,
-      daysUntilDisconnection: bills.daysUntilDisconnection,
-      billerAccountEncrypted: bills.billerAccountEncrypted,
-    }).from(bills).where(inArray(bills.status, ['verified', 'funded'])).orderBy(desc(bills.createdAt)).limit(50);
-    return { bills: rows.map(({ billerAccountEncrypted, ...bill }) => ({
-      ...bill,
-      accountLast4: billerAccountEncrypted ? decryptAccountNumber(billerAccountEncrypted).slice(-4) : null,
-    })) };
-  });
-
+  registerBillRoutes(app, services, requireAuth);
   registerDonationRoutes(app, services, requireAuth);
+  registerAdminRoutes(app, services, requireAuth);
 
   app.post('/api/webhooks/stripe', async (request, reply) => {
     const signature = request.headers['stripe-signature'];
     if (typeof signature !== 'string' || !request.rawBody) return reply.code(400).send({ error: 'Missing webhook signature' });
     let event;
-    try {
-      event = verifyStripeWebhook(request.rawBody, signature, services.config);
-    } catch {
-      return reply.code(400).send({ error: 'Invalid webhook signature or event' });
-    }
+    try { event = verifyStripeWebhook(request.rawBody, signature, services.config); }
+    catch { return reply.code(400).send({ error: 'Invalid webhook signature or event' }); }
     return handleVerifiedStripeEvent(event, services);
   });
 

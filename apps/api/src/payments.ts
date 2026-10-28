@@ -3,7 +3,7 @@ import { and, eq, gt, sql, sum } from 'drizzle-orm';
 import { z } from 'zod';
 import { auditLogs, bills, transactions, users } from '@open-relief/db';
 import { decryptAccountNumber } from '@open-relief/db/security/encryption';
-import { calculateDonationSplit, DonationSplitInputSchema } from '@open-relief/shared';
+import { calculateDonationSplit, DonationSplitInputSchema, LEGAL_TERMS_VERSION, LegalAcceptanceSchema } from '@open-relief/shared';
 import type { Services } from './services.js';
 
 export const CreateIntentSchema = DonationSplitInputSchema.extend({
@@ -11,6 +11,7 @@ export const CreateIntentSchema = DonationSplitInputSchema.extend({
   donorId: z.string().uuid(),
   idempotencyKey: z.string().uuid(),
   billAmountCents: z.number().int().positive().max(100_000_000),
+  donorAcceptance: LegalAcceptanceSchema,
 });
 
 export interface PaymentIntent {
@@ -86,6 +87,7 @@ export async function createDonationIntent(input: z.infer<typeof CreateIntentSch
       billAmountCents: String(request.billAmountCents),
       processingFeeCoveredCents: String(split.processingFeeCoveredCents),
       platformTipCents: String(split.platformTipCents),
+      donorTermsVersion: LEGAL_TERMS_VERSION,
     };
     const intent = await stripe.createIntent(split.totalChargeCents, metadata, request.idempotencyKey);
     const persistedTransactionId = z.string().uuid().parse(intent.metadata.transactionId);
@@ -105,6 +107,8 @@ export async function createDonationIntent(input: z.infer<typeof CreateIntentSch
       stripeFeeCents: split.stripeFeeCents,
       netPlatformTipCents: split.netPlatformTipCents,
       stripePaymentIntentId: intent.id,
+      donorTermsAcceptedAt: new Date(),
+      donorTermsVersion: LEGAL_TERMS_VERSION,
       expiresAt,
     });
     return { transactionId: persistedTransactionId, paymentIntentId: intent.id, clientSecret: intent.clientSecret, split, feeBreakdown: split, expiresAt: expiresAt.toISOString(), metadata: intent.metadata };

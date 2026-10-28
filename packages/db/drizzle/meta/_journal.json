@@ -36,6 +36,13 @@
       "when": 1793144734867,
       "tag": "0004_boring_crusher_hogan",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793185235536,
+      "tag": "0005_swift_centennial",
+      "breakpoints": true
     }
   ]
 }

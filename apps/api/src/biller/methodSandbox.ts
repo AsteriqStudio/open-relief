@@ -22,6 +22,10 @@ const demoMerchants = [
   { id: 'mock-demo-utility', name: 'Demo Utility', routingNumber: '100000007' },
 ] as const;
 
+export function isVerifiedDemoMerchantId(id: string): boolean {
+  return demoMerchants.some((merchant) => merchant.id === id);
+}
+
 /** Deterministic local simulation of Method's sandbox bill-pay contract. No HTTP or funds move. */
 export class MethodSandboxBillerClient implements IMethodBillerClient {
   readonly baseUrl = METHOD_SANDBOX_BASE_URL;
@@ -35,7 +39,7 @@ export class MethodSandboxBillerClient implements IMethodBillerClient {
 
   async createPayment(input: z.input<typeof SandboxPaymentInputSchema>) {
     const payment = SandboxPaymentInputSchema.parse(input);
-    if (!demoMerchants.some((merchant) => merchant.id === payment.destinationBillerId)) {
+    if (!isVerifiedDemoMerchantId(payment.destinationBillerId)) {
       throw new Error('Sandbox payment requires a verified demo creditor');
     }
     const digest = createHash('sha256').update(payment.idempotencyKey).digest('hex').slice(0, 24);

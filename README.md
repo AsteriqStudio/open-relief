@@ -37,7 +37,7 @@ pnpm test
 EXPO_NO_TELEMETRY=1 EXPO_OFFLINE=1 pnpm --filter @open-relief/mobile export
 ```
 
-The end-to-end test uploads a JPEG through the presigned form, checks EXIF removal, waits for mock OCR, rejects a duplicate, creates a mock donation, verifies the webhook signature and replay handling, and confirms the bill is settled. Adapter tests exercise signed Stripe test webhook fixtures, partial and full settlement, fee splits, and Method sandbox routing without external credentials. Vetting tests check urgency, annual aid exposure, cooldown, name matching, rejection, and manual review. Tests create uniquely identified demo data on each run.
+The end-to-end test uploads a JPEG through the presigned form, checks EXIF removal, waits for mock OCR, rejects a duplicate, creates a mock donation, verifies the webhook signature and replay handling, and confirms the bill is settled. Adapter tests exercise signed Stripe test webhook fixtures, partial and full settlement, fee splits, and Method sandbox routing without external credentials. Vetting and admin tests check eligibility, role guards, approval, rejection, audit records, and feed visibility. Tests create uniquely identified demo data on each run.
 
 ## Stripe test checkout and Method simulation
 
@@ -57,10 +57,18 @@ Before a bill enters the feed, the vetting service checks for shut-off or past-d
 
 The donor app has a spring-driven swipe deck with haptics, an urgency indicator, a direct-creditor checkout sheet with preset or custom amounts, an unchanged fee split, and a confirmation card. A test PaymentSheet success first shows payment acceptance; the creditor confirmation appears only after the signed webhook records settlement. The app can share the non-deductible payment confirmation.
 
+## Admin review and legal acceptance
+
+Recipients must name the creditor and accept the versioned attestation before the API issues an upload URL. The API records the acceptance time and version on the bill. Donors must accept the versioned gift disclosure before the API creates a payment intent; the transaction stores that acceptance. The app displays Terms of Service and Privacy Notice modals. These are sandbox legal drafts and need qualified legal review before public use.
+
+Admin accounts cannot be created through public signup. For a local admin, provide `ADMIN_EMAIL`, `ADMIN_PASSWORD` (at least 12 characters), and `ADMIN_PHONE` through the local shell or secure environment settings, load `.env.local`, then run `pnpm --filter @open-relief/api bootstrap-admin`. The command refuses to run with `NODE_ENV=production` and refuses to elevate an existing email. Sign in with that account through the mobile app. In development builds, Profile can switch between previously authenticated recipient, donor, and admin accounts; switching verifies the stored session with the server and never changes the account's role.
+
+The admin API lists pending reviews with pagination, serves review images to authenticated admins, and records approve or reject decisions in the audit log. Approval requires the current recipient attestation, an allowlisted demo creditor, an intact balance, and room under the annual aid limit. Rejection stores the stated reason. The API formats a recipient notification payload but does not send email. The mobile screen previews JPEG and PNG files; PDF files require an approved document viewer before a reviewer can inspect the original.
+
 ## Boundaries
 
 - Stripe test mode can present PaymentSheet with test cards, but no real funds move. The Method adapter is a local sandbox simulation and cannot disburse money.
 - The mock OCR adapter recognizes only a demo biller. Textract extraction can produce a bill for manual review, but it cannot approve a live creditor or route money.
-- Authentication uses local password accounts and revocable database sessions. Names and assistance programs are self-reported, so the match is a review signal rather than proof of identity. Household linking, email verification, password recovery, abuse throttling, and a protected admin review workflow are still required before public deployment. The API remains bound to loopback.
+- Authentication uses local password accounts and revocable database sessions. Names and assistance programs are self-reported, so the match is a review signal rather than proof of identity. Household linking, email verification, password recovery, abuse throttling, stronger admin enrollment, PDF review support, and delivered decision notifications are still required before public deployment. The API remains bound to loopback.
 - Payment confirmations make no tax-deductibility claim. Direct bill payments are not automatically charitable contributions, and the project has no verified 501(c)(3) status. The generated email payload is a payment confirmation, not a charitable tax receipt.
 - A future live design needs verified creditor routing, payment-provider coordination, authentication, privacy and fraud controls, and legal review. A Stripe charge followed by a separate disbursement does not alone establish that the platform avoids custody or money-transmission obligations.

@@ -117,8 +117,9 @@ test('signed Stripe test events settle partial and full bills once through Metho
       return app.inject({ method: 'POST', url: '/api/webhooks/stripe', headers: { 'content-type': 'application/json', 'stripe-signature': signature }, payload });
     };
     const partialKey = randomUUID();
-    const partial = await createDonationIntent({ billId, donorId, billAmountCents: 5_000, coverProcessingFee: true, tipPercentage: 10, idempotencyKey: partialKey }, services, fakeStripeClient);
-    const duplicateIntent = await createDonationIntent({ billId, donorId, billAmountCents: 5_000, coverProcessingFee: true, tipPercentage: 10, idempotencyKey: partialKey }, services, fakeStripeClient);
+    const donorAcceptance = { accepted: true as const, termsVersion: 'v1.0' as const };
+    const partial = await createDonationIntent({ billId, donorId, billAmountCents: 5_000, coverProcessingFee: true, tipPercentage: 10, idempotencyKey: partialKey, donorAcceptance }, services, fakeStripeClient);
+    const duplicateIntent = await createDonationIntent({ billId, donorId, billAmountCents: 5_000, coverProcessingFee: true, tipPercentage: 10, idempotencyKey: partialKey, donorAcceptance }, services, fakeStripeClient);
     assert.equal(duplicateIntent.clientSecret, partial.clientSecret);
     const partialMetadata = partial.metadata!;
     const mismatched = await sendSucceeded(partial, { ...partialMetadata, billAmountCents: '1' });
@@ -132,7 +133,7 @@ test('signed Stripe test events settle partial and full bills once through Metho
     const replay = await sendSucceeded(partial, partialMetadata);
     assert.equal(replay.statusCode, 200, replay.body);
     assert.equal(replay.json<{ settlement: { alreadyProcessed: boolean } }>().settlement.alreadyProcessed, true);
-    const full = await createDonationIntent({ billId, donorId, billAmountCents: 7_500, coverProcessingFee: false, tipPercentage: 20, idempotencyKey: randomUUID() }, services, fakeStripeClient);
+    const full = await createDonationIntent({ billId, donorId, billAmountCents: 7_500, coverProcessingFee: false, tipPercentage: 20, idempotencyKey: randomUUID(), donorAcceptance }, services, fakeStripeClient);
     const second = await sendSucceeded(full, full.metadata!);
     assert.equal(second.statusCode, 200, second.body);
     const [bill] = await services.db.select().from(bills).where(eq(bills.id, billId));

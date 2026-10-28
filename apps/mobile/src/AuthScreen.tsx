@@ -29,6 +29,7 @@ export function AuthScreen() {
   return <Modal visible animationType="slide"><ScrollView className="flex-1 bg-slate-50 p-6" contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}>
     <Text className="text-3xl font-bold text-slate-900">open-relief</Text>
     <Text className="mt-2 text-slate-600">{mode === 'signin' ? 'Sign in to continue' : 'Create your account'}</Text>
+    {mode === 'signin' && <Text className="mt-2 text-xs text-slate-500">Admin accounts are created locally with the bootstrap command and sign in here.</Text>}
     {mode === 'signup' && <View className="mt-6 flex-row gap-2">
       <Pressable onPress={() => setRole('recipient')} className={`flex-1 rounded-xl p-3 ${role === 'recipient' ? 'bg-teal-700' : 'bg-slate-200'}`}><Text className={`text-center ${role === 'recipient' ? 'text-white' : 'text-slate-900'}`}>Need Relief</Text></Pressable>
       <Pressable onPress={() => setRole('donor')} className={`flex-1 rounded-xl p-3 ${role === 'donor' ? 'bg-teal-700' : 'bg-slate-200'}`}><Text className={`text-center ${role === 'donor' ? 'text-white' : 'text-slate-900'}`}>Give Relief</Text></Pressable>

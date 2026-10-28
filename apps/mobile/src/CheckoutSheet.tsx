@@ -3,10 +3,12 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useStripe } from '@stripe/stripe-react-native';
 import * as Haptics from 'expo-haptics';
-import { calculateDonationSplit } from '@open-relief/shared';
+import { calculateDonationSplit, donorGiftDisclosure } from '@open-relief/shared';
 import { completeMockDonation, createDonationIntent } from './api';
 import type { DonationIntent, FeedBill } from './api';
 import { useAuth } from './AuthContext';
+import { LegalModal } from './LegalModal';
+import type { LegalDocument } from './LegalModal';
 
 export type CheckoutConfirmation = { billId: string; transactionId: string; amountCents: number; mode: 'mock' | 'test'; billerName: string; accountLast4: string | null };
 const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
@@ -37,6 +39,8 @@ export function CheckoutSheet({ bill, onClose, onComplete }: { bill: FeedBill | 
   const [coverProcessingFee, setCoverProcessingFee] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [donorTermsAccepted, setDonorTermsAccepted] = useState(false);
+  const [legalDocument, setLegalDocument] = useState<LegalDocument | null>(null);
   const [pendingTestIntent, setPendingTestIntent] = useState<{ intent: DonationIntent; confirmation: CheckoutConfirmation } | null>(null);
 
   useEffect(() => {
@@ -47,6 +51,7 @@ export function CheckoutSheet({ bill, onClose, onComplete }: { bill: FeedBill | 
     setCoverProcessingFee(true);
     setBusy(false);
     setError(null);
+    setDonorTermsAccepted(false);
     setPendingTestIntent(null);
     requestAnimationFrame(() => sheet.current?.present());
   }, [bill]);
@@ -71,12 +76,12 @@ export function CheckoutSheet({ bill, onClose, onComplete }: { bill: FeedBill | 
   }
 
   async function donate() {
-    if (!bill || !validAmount || amountCents === null || !split || tipPercentage === null || !token || busy) return;
+    if (!bill || !validAmount || amountCents === null || !split || tipPercentage === null || !donorTermsAccepted || !token || busy) return;
     setBusy(true);
     setError(null);
     let waitingForSheet = false;
     try {
-      const intent = await createDonationIntent({ billId: bill.id, amountCents, coverProcessingFee, tipPercentage }, token);
+      const intent = await createDonationIntent({ billId: bill.id, amountCents, coverProcessingFee, tipPercentage, donorTermsAccepted: true }, token);
       const confirmation: CheckoutConfirmation = { billId: bill.id, transactionId: intent.transactionId, amountCents, mode: intent.mode, billerName: bill.billerName ?? 'demo creditor', accountLast4: bill.accountLast4 };
       if (intent.mode === 'mock') {
         await completeMockDonation(intent.transactionId, token);
@@ -106,10 +111,13 @@ export function CheckoutSheet({ bill, onClose, onComplete }: { bill: FeedBill | 
       <Text className="mt-6 text-xs font-bold uppercase tracking-widest text-slate-500">Optional platform tip</Text>
       <View className="mt-3 flex-row rounded-2xl bg-slate-100 p-1">{([0, 10, 15, 20] as const).map((value) => <Pressable key={value} accessibilityRole="button" onPress={() => setTipPercentage(value)} className={`flex-1 rounded-xl p-3 ${tipPercentage === value ? 'bg-white shadow-sm' : ''}`}><Text className={`text-center font-bold ${tipPercentage === value ? 'text-emerald-800' : 'text-slate-500'}`}>{value}%</Text></Pressable>)}</View>
       {split && <View className="mt-7 rounded-3xl border border-slate-200 bg-white p-5"><Text className="text-lg font-bold text-slate-900">Payment summary</Text><View className="mt-4 flex-row justify-between"><Text className="text-slate-600">To creditor</Text><Text className="font-semibold text-slate-900">{dollars(split.netPaymentToBillerCents)}</Text></View><View className="mt-3 flex-row justify-between"><Text className="text-slate-600">Estimated processing fee</Text><Text className="font-semibold text-slate-900">{dollars(split.stripeFeeCents)}</Text></View><View className="mt-3 flex-row justify-between"><Text className="text-slate-600">Fee you cover</Text><Text className="font-semibold text-slate-900">{dollars(split.processingFeeCoveredCents)}</Text></View><View className="mt-3 flex-row justify-between"><Text className="text-slate-600">Platform tip</Text><Text className="font-semibold text-slate-900">{dollars(split.platformTipCents)}</Text></View><View className="mt-5 h-px bg-slate-200" /><View className="mt-4 flex-row justify-between"><Text className="text-lg font-black text-slate-900">Total test charge</Text><Text className="text-lg font-black text-slate-900">{dollars(split.totalChargeCents)}</Text></View></View>}
+      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: donorTermsAccepted }} onPress={() => setDonorTermsAccepted((value) => !value)} className="mt-6 flex-row rounded-2xl border border-slate-200 bg-white p-4"><Text className="mr-3 text-xl text-emerald-700">{donorTermsAccepted ? '☑' : '□'}</Text><Text className="flex-1 text-sm leading-5 text-slate-700">{donorGiftDisclosure(bill?.billerName ?? 'the demo creditor')}</Text></Pressable>
+      <View className="mt-3 flex-row gap-5"><Pressable onPress={() => setLegalDocument('terms')}><Text className="font-semibold text-emerald-700">Terms of service</Text></Pressable><Pressable onPress={() => setLegalDocument('privacy')}><Text className="font-semibold text-emerald-700">Privacy notice</Text></Pressable></View>
       {error && <Text className="mt-4 text-sm text-red-700">{error}</Text>}
-      <Pressable accessibilityRole="button" disabled={!split || busy} onPress={() => void donate()} className={`mt-6 rounded-2xl p-5 ${split && !busy ? 'bg-emerald-600' : 'bg-slate-400'}`}><Text className="text-center text-base font-black text-white">{busy ? 'Preparing payment…' : split ? `Continue · ${dollars(split.totalChargeCents)}` : 'Choose an amount and tip'}</Text></Pressable>
+      <Pressable accessibilityRole="button" disabled={!split || !donorTermsAccepted || busy} onPress={() => void donate()} className={`mt-6 rounded-2xl p-5 ${split && donorTermsAccepted && !busy ? 'bg-emerald-600' : 'bg-slate-400'}`}><Text className="text-center text-base font-black text-white">{busy ? 'Preparing payment…' : split ? `Continue · ${dollars(split.totalChargeCents)}` : 'Choose an amount and tip'}</Text></Pressable>
       {pendingTestIntent && <StripePaymentPresenter intent={pendingTestIntent.intent} onSuccess={() => finish(pendingTestIntent.confirmation)} onFailure={(message) => { setPendingTestIntent(null); setBusy(false); setError(message); }} />}
       <Text className="mt-4 text-center text-xs leading-4 text-slate-500">Test cards only. Mock mode settles a simulated creditor payment without PaymentSheet. Payment confirmations are not charitable tax receipts.</Text>
+      <LegalModal document={legalDocument} onClose={() => setLegalDocument(null)} />
     </BottomSheetScrollView>
   </BottomSheetModal>;
 }

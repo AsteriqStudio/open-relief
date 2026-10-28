@@ -11,6 +11,8 @@ export const BillSchema = z.object({
   isShutoffNotice: z.boolean(),
   daysUntilDisconnection: z.number().int().nonnegative().nullable(),
   rejectionReason: z.string().nullable(),
+  termsAcceptedAt: z.string().datetime({ offset: true }).nullable(),
+  termsVersion: z.string().nullable(),
   billerAccountEncrypted: z.string().min(1),
   dueDate: z.string().date(),
   statementBalanceCents: z.number().int().positive(),

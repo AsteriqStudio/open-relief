@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { randomUUID } from 'expo-crypto';
+import { LEGAL_TERMS_VERSION } from '@open-relief/shared';
 
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? 'http://127.0.0.1:3000';
 const BillSchema = z.object({
@@ -70,6 +71,8 @@ export async function uploadBill(input: {
   uri: string;
   mimeType: 'image/jpeg' | 'image/png' | 'application/pdf';
   name: string;
+  declaredBillerName: string;
+  attestationAccepted: true;
 }, token: string): Promise<string> {
   const file = await (await fetch(input.uri)).blob();
   const details = z.object({
@@ -79,7 +82,7 @@ export async function uploadBill(input: {
   }).parse(await request('/api/bills/upload-url', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ category: input.category, zipCode: input.zipCode, story: input.story, mimeType: input.mimeType, sizeBytes: file.size }),
+    body: JSON.stringify({ category: input.category, zipCode: input.zipCode, story: input.story, mimeType: input.mimeType, sizeBytes: file.size, declaredBillerName: input.declaredBillerName, attestation: { accepted: input.attestationAccepted, termsVersion: LEGAL_TERMS_VERSION } }),
   }, token));
   const form = new FormData();
   for (const [key, value] of Object.entries(details.fields)) form.append(key, value);
@@ -104,11 +107,12 @@ export async function createDonationIntent(input: {
   amountCents: number;
   coverProcessingFee: boolean;
   tipPercentage: number;
+  donorTermsAccepted: true;
 }, token: string): Promise<DonationIntent> {
   return DonationIntentSchema.parse(await request('/api/donations/create-intent', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ...input, idempotencyKey: randomUUID() }),
+    body: JSON.stringify({ ...input, donorTermsAccepted: undefined, donorAcceptance: { accepted: input.donorTermsAccepted, termsVersion: LEGAL_TERMS_VERSION }, idempotencyKey: randomUUID() }),
   }, token));
 }
 
@@ -130,4 +134,25 @@ export type DonationReceipt = z.infer<typeof DonationReceiptSchema>;
 
 export async function getDonationReceipt(transactionId: string, token: string): Promise<DonationReceipt> {
   return DonationReceiptSchema.parse(await request(`/api/donations/${transactionId}/receipt`, undefined, token));
+}
+
+const AdminReviewSchema = z.object({
+  billId: z.string().uuid(), recipientEmail: z.string().email(), recipientLegalName: z.string().nullable(),
+  billerName: z.string().nullable(), accountHolderName: z.string().nullable(), statementBalanceCents: z.number().int().nullable(),
+  daysUntilDisconnection: z.number().int().nullable(), rejectionReason: z.string().nullable(), ocrConfidence: z.number().nullable(),
+  documentMimeType: z.string(), createdAt: z.string().datetime(), nameMatchPercentage: z.number().int().nullable(),
+});
+export type AdminReview = z.infer<typeof AdminReviewSchema>;
+
+export async function getPendingReviews(page: number, token: string): Promise<{ reviews: AdminReview[]; total: number; page: number; limit: number }> {
+  return z.object({ reviews: z.array(AdminReviewSchema), total: z.number().int(), page: z.number().int(), limit: z.number().int() })
+    .parse(await request(`/api/admin/reviews/pending?page=${page}&limit=20`, undefined, token));
+}
+
+export async function decideReview(billId: string, decision: 'approve' | 'reject', notes: string, token: string): Promise<void> {
+  await request(`/api/admin/reviews/${billId}/decision`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision, notes }) }, token);
+}
+
+export function adminDocumentSource(billId: string, token: string): { uri: string; headers: Record<string, string> } {
+  return { uri: `${API_BASE}/api/admin/reviews/${billId}/document`, headers: { Authorization: `Bearer ${token}` } };
 }

@@ -5,6 +5,8 @@ import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { Worker } from 'bullmq';
 import { Redis } from 'ioredis';
 import sharp from 'sharp';
+import { eq } from 'drizzle-orm';
+import { bills, transactions } from '@open-relief/db';
 import { buildApp } from '../dist/app.js';
 import { ApiConfigSchema } from '../dist/config.js';
 import { processUploadedBill } from '../dist/ingestion.js';
@@ -45,6 +47,8 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     assert.equal(deniedUpload.statusCode, 401);
     const wrongRole = await app.inject({ method: 'POST', url: '/api/bills/upload-url', headers: donorHeaders, payload: {} });
     assert.equal(wrongRole.statusCode, 403);
+    const missingAttestation = await app.inject({ method: 'POST', url: '/api/bills/upload-url', headers: recipientHeaders, payload: { category: 'electric', mimeType: 'image/jpeg', sizeBytes: 100, zipCode: '48201', story: 'Past due bill', declaredBillerName: 'Demo Utility' } });
+    assert.equal(missingAttestation.statusCode, 400);
     const signIn = await app.inject({ method: 'POST', url: '/api/auth/signin', payload: { email: donor.user.email, password: 'local test password 2026' } });
     assert.equal(signIn.statusCode, 200);
     assert.equal(signIn.json<{ user: { id: string } }>().user.id, donor.user.id);
@@ -52,7 +56,7 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     const image = await sharp({ create: { width: 3, height: 3, channels: 3, background: { r: color[0]!, g: color[1]!, b: color[2]! } } }).jpeg().withExif({ IFD0: { Copyright: 'metadata to strip' } }).toBuffer();
     const submit = async () => {
       const response = await app.inject({ method: 'POST', url: '/api/bills/upload-url', headers: recipientHeaders, payload: {
-        category: 'electric', mimeType: 'image/jpeg', sizeBytes: image.length, zipCode: '48201', story: 'Demo family facing an overdue power bill',
+        category: 'electric', mimeType: 'image/jpeg', sizeBytes: image.length, zipCode: '48201', story: 'Demo family facing an overdue power bill', declaredBillerName: 'Demo Utility', attestation: { accepted: true, termsVersion: 'v1.0' },
       } });
       assert.equal(response.statusCode, 201, response.body);
       const details = response.json<{ billId: string; url: string; fields: Record<string, string> }>();
@@ -66,6 +70,9 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
       return details.billId;
     };
     const billId = await submit();
+    const [attestedBill] = await services.db.select({ termsAcceptedAt: bills.termsAcceptedAt, termsVersion: bills.termsVersion }).from(bills).where(eq(bills.id, billId));
+    assert.ok(attestedBill?.termsAcceptedAt);
+    assert.equal(attestedBill.termsVersion, 'v1.0');
     let billStatus = 'pending_ocr';
     for (let attempt = 0; attempt < 50; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -81,11 +88,16 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     const feed = (await app.inject({ method: 'GET', url: '/api/bills/feed' })).json<{ bills: Array<{ id: string }> }>();
     assert.ok(feed.bills.some((bill) => bill.id === billId));
 
+    const missingDonorTerms = await app.inject({ method: 'POST', url: '/api/donations/create-intent', headers: donorHeaders, payload: { billId, amountCents: 1000, coverProcessingFee: true, tipPercentage: 0 } });
+    assert.equal(missingDonorTerms.statusCode, 400);
     const intentResponse = await app.inject({ method: 'POST', url: '/api/donations/create-intent', headers: donorHeaders, payload: {
-      billId, amountCents: 12_000, coverProcessingFee: true, tipPercentage: 0, idempotencyKey: randomUUID(),
+      billId, amountCents: 12_000, coverProcessingFee: true, tipPercentage: 0, idempotencyKey: randomUUID(), donorAcceptance: { accepted: true, termsVersion: 'v1.0' },
     } });
     assert.equal(intentResponse.statusCode, 201, intentResponse.body);
     const intent = intentResponse.json<{ transactionId: string; paymentIntentId: string; mode: string }>();
+    const [acceptedTransaction] = await services.db.select({ acceptedAt: transactions.donorTermsAcceptedAt, version: transactions.donorTermsVersion }).from(transactions).where(eq(transactions.id, intent.transactionId));
+    assert.ok(acceptedTransaction?.acceptedAt);
+    assert.equal(acceptedTransaction.version, 'v1.0');
     assert.equal(intent.mode, 'mock');
     const payload = JSON.stringify({ id: `evt_mock_${randomUUID()}`, type: 'payment_intent.succeeded', data: { object: { id: intent.paymentIntentId } } });
     const rejected = await app.inject({ method: 'POST', url: '/api/webhooks/stripe', headers: { 'content-type': 'application/json', 'stripe-signature': 't=0,v1=0' }, payload });

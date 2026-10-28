@@ -4,6 +4,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { bills, transactions } from '@open-relief/db';
 import { decryptAccountNumber } from '@open-relief/db/security/encryption';
+import { LegalAcceptanceSchema } from '@open-relief/shared';
 import type { registerAuth } from '../auth.js';
 import { createDonationIntent, settleMockPayment } from '../payments.js';
 import type { Services } from '../services.js';
@@ -15,6 +16,7 @@ const DonationIntentRequestSchema = z.object({
   coverProcessingFee: z.boolean(),
   tipPercentage: z.number().finite().min(0).max(100),
   idempotencyKey: z.string().uuid().default(() => randomUUID()),
+  donorAcceptance: LegalAcceptanceSchema,
 }).strict();
 const TransactionIdSchema = z.object({ id: z.string().uuid() });
 
@@ -29,6 +31,7 @@ export function registerDonationRoutes(app: FastifyInstance, services: Services,
       coverProcessingFee: input.coverProcessingFee,
       tipPercentage: input.tipPercentage,
       idempotencyKey: input.idempotencyKey,
+      donorAcceptance: input.donorAcceptance,
     }, services, provider.client);
     return reply.code(201).send({ ...result, mode: provider.mode });
   });

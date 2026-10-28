@@ -27,7 +27,8 @@ Update this file when a task changes status. Keep implementation claims tied to 
 - [x] Phase 10: Commit and push the verified release candidate to `feature/sandbox-mvp`.
 - [x] Phase 11: Add USD/EUR display, four isolated fictional pitch cards, offline checkout simulation, seed migration, and co-founder walkthrough.
 - [x] Phase 11: Add reproducible release APK build script and GitHub Actions artifact/prerelease workflow.
-- [ ] Phase 11: Verify a standalone installable APK from GitHub Actions and deliver its binary/checksum. The local Gradle build reached native compilation but the environment proxy blocks `repo.reactnative.dev` with HTTP 403.
+- [x] Phase 11: Build, publish, download, and verify the standalone Android APK and SHA-256 checksum. Release candidate: `phase11-demo-rc1`.
+- [x] Release Candidate: Phase 11 offline pitch APK and walkthrough published to GitHub; installable package and checksum verified.
 
 ## Verification record
 
@@ -35,7 +36,9 @@ Update this file when a task changes status. Keep implementation claims tied to 
 - `pnpm test` — 18 tests passed after the Phase 10 implementation and receipt changes.
 - Android and web Expo exports — passed after the Phase 10 implementation and receipt changes.
 - Browser check — telecom sponsor badge, $7.50 + $7.50 checkout, matched confirmation, and depleted-buffer guard passed on a phone-width viewport with no page errors.
-- Phase 11 offline Android and web Expo bundles compiled; the native APK is pending the GitHub Actions build because the local Maven proxy blocks React Native AAR downloads.
+- Phase 11: `pnpm run typecheck` passed; `pnpm test` passed all 19 tests; `pnpm run seed` migrated and seeded two USD plus two EUR pitch cards in a separate presentation table.
+- Phase 11 offline Android and web Expo bundles compiled. The Gradle `:app:createBundleReleaseJsAndAssets` task passed locally after adding the explicit Babel JSX plugin dependency.
+- GitHub Actions run `40734730166` succeeded: APK build, artifact upload, and labeled prerelease publication. The downloaded `builds/open-relief-demo.apk` is 89,864,917 bytes, has SHA-256 `68950b06e7d7081813c67cd4e9b777045e723625dd6c930c330d0073b8fc1baf`, contains `assets/index.android.bundle`, and passes `apksigner verify` with the demo signing certificate. Package `org.openrelief.app`, minimum Android SDK 24.
 
 ## Boundaries and next gates
 
@@ -44,3 +47,4 @@ Update this file when a task changes status. Keep implementation claims tied to 
 - The test-mode expiry worker verifies provider status before releasing an expired test reservation. Actual Stripe test keys and native PaymentSheet have not been exercised in this environment; tests use signed fixtures. Live payment operations remain behind a separate financial approval gate.
 - The demo has no executed agent-of-the-payee agreement and makes no money-transmitter exemption claim. Legal copy remains a draft for qualified review.
 - Public deployment still needs independently verified creditor routing, payment-provider and legal arrangements, stronger authentication and fraud controls, delivered notifications, and a successful cloud environment publication.
+- The Phase 11 APK is an offline fictional payment simulation. No Android device or emulator was attached here, so on-device launch and gesture checks remain to be done by a human tester. The local workspace could not download React Native AARs through its proxy; the GitHub Actions native build succeeded. The APK uses a demo debug signing certificate and is not a Play Store release.

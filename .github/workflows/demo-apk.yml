@@ -46,7 +46,22 @@ jobs:
           yes | "$manager" --sdk_root="$sdk_root" --licenses >/dev/null || true
           "$manager" --sdk_root="$sdk_root" 'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.1.12297006'
       - name: Build embedded, signed demo APK
-        run: bash scripts/build-demo-apk.sh
+        run: |
+          if bash scripts/build-demo-apk.sh > "$RUNNER_TEMP/demo-apk-build.log" 2>&1; then
+            tail -20 "$RUNNER_TEMP/demo-apk-build.log"
+          else
+            tail -100 "$RUNNER_TEMP/demo-apk-build.log"
+            {
+              echo '### APK build failure details'
+              echo '```text'
+              tail -100 "$RUNNER_TEMP/demo-apk-build.log"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            detail="$(awk '/What went wrong:/{found=1;next}/Try:/{found=0} found' "$RUNNER_TEMP/demo-apk-build.log" | tr '\n' ' ' | cut -c1-800)"
+            [[ -n "$detail" ]] || detail="$(tail -8 "$RUNNER_TEMP/demo-apk-build.log" | tr '\n' ' ' | cut -c1-800)"
+            echo "::error title=Demo APK build failed::$detail"
+            exit 1
+          fi
       - name: Upload run artifact
         uses: actions/upload-artifact@v4
         with:

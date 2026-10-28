@@ -13,6 +13,7 @@ import { AuthScreen } from './src/AuthScreen';
 import { StripeProvider } from './src/stripeAdapter';
 import { AdminReviewScreen } from './src/AdminReviewScreen';
 import { ProfileScreen } from './src/ProfileScreen';
+import { OfflineDemoScreen } from './src/OfflineDemoScreen';
 
 const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
@@ -39,6 +40,7 @@ function SignedInApp() {
 }
 
 export default function App() {
+  if (process.env.EXPO_PUBLIC_OFFLINE_DEMO === '1') return <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider><BottomSheetModalProvider><SafeAreaView className="flex-1 bg-canvas"><StatusBar style="dark" /><OfflineDemoScreen /></SafeAreaView></BottomSheetModalProvider></SafeAreaProvider></GestureHandlerRootView>;
   const content = <AuthProvider><SignedInApp /></AuthProvider>;
   return stripePublishableKey?.startsWith('pk_test_')
     ? <StripeProvider publishableKey={stripePublishableKey}>{content}</StripeProvider>

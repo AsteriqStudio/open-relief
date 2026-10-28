@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calculateDonationSplit, calculateSponsoredDonationSplit, calculateSponsorMatchCents, calculateSponsorRetainerCents } from './feeEngine.js';
+import { calculateDonationSplit, calculateSponsoredDonationSplit, calculateSponsorMatchCents, calculateSponsorRetainerCents, formatCurrency } from './feeEngine.js';
+import { PITCH_CARDS } from '../pitchDeck.js';
+
+test('offline pitch cards use explicit currencies and fictional rails', () => {
+  assert.equal(formatCurrency(14_250), '$142.50');
+  assert.equal(formatCurrency(11_800, 'EUR'), '118,00 €');
+  assert.equal(PITCH_CARDS.length, 4);
+  assert.equal(PITCH_CARDS.filter((card) => card.currency === 'EUR').length, 2);
+  assert.ok(PITCH_CARDS.every((card) => card.railLabel.includes('sandbox') || card.railLabel.includes('concept')));
+  assert.throws(() => formatCurrency(Number.POSITIVE_INFINITY));
+});
 
 test('covered processing preserves principal and net tip', () => {
   assert.deepEqual(calculateDonationSplit({ billAmountCents: 10_000, tipPercentage: 10, coverProcessingFee: true }), {

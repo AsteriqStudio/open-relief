@@ -25,6 +25,9 @@ Update this file when a task changes status. Keep implementation claims tied to 
 - [x] Phase 10: Show sponsor badge, match estimate, actual receipt split, and depleted-buffer warning in the mobile UI.
 - [x] Phase 10: Complete final typecheck, tests, Android export, and web export.
 - [x] Phase 10: Commit and push the verified release candidate to `feature/sandbox-mvp`.
+- [x] Phase 11: Add USD/EUR display, four isolated fictional pitch cards, offline checkout simulation, seed migration, and co-founder walkthrough.
+- [x] Phase 11: Add reproducible release APK build script and GitHub Actions artifact/prerelease workflow.
+- [ ] Phase 11: Verify a standalone installable APK from GitHub Actions and deliver its binary/checksum. The local Gradle build reached native compilation but the environment proxy blocks `repo.reactnative.dev` with HTTP 403.
 
 ## Verification record
 
@@ -32,6 +35,7 @@ Update this file when a task changes status. Keep implementation claims tied to 
 - `pnpm test` — 18 tests passed after the Phase 10 implementation and receipt changes.
 - Android and web Expo exports — passed after the Phase 10 implementation and receipt changes.
 - Browser check — telecom sponsor badge, $7.50 + $7.50 checkout, matched confirmation, and depleted-buffer guard passed on a phone-width viewport with no page errors.
+- Phase 11 offline Android and web Expo bundles compiled; the native APK is pending the GitHub Actions build because the local Maven proxy blocks React Native AAR downloads.
 
 ## Boundaries and next gates
 

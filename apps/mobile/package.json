@@ -6,7 +6,9 @@
   "scripts": {
     "start": "expo start --localhost",
     "typecheck": "tsc --noEmit",
-    "export": "expo export --platform android"
+    "export": "expo export --platform android",
+    "android": "expo run:android",
+    "ios": "expo run:ios"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

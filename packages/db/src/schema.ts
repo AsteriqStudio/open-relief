@@ -1,5 +1,6 @@
 import { boolean, check, date, index, integer, jsonb, numeric, pgEnum, pgTable, real, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
+import type { PitchCard } from '@open-relief/shared';
 
 export const userRole = pgEnum('user_role', ['recipient', 'donor', 'admin']);
 export const billCategory = pgEnum('bill_category', ['electric', 'water', 'gas', 'medical', 'telecom']);
@@ -27,6 +28,18 @@ export const authSessions = pgTable('auth_sessions', {
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   revokedAt: timestamp('revoked_at', { withTimezone: true }),
 }, (table) => [index('auth_sessions_user_idx').on(table.userId)]);
+
+/** Presentation fixtures are never read by donation or settlement routes. */
+export const pitchDemoCards = pgTable('pitch_demo_cards', {
+  id: uuid('id').primaryKey(),
+  currency: text('currency').$type<'USD' | 'EUR'>().notNull(),
+  region: text('region').$type<'US' | 'DE'>().notNull(),
+  payload: jsonb('payload').$type<PitchCard>().notNull(),
+  seededAt: timestamp('seeded_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  check('pitch_demo_cards_currency_check', sql`${table.currency} IN ('USD', 'EUR')`),
+  check('pitch_demo_cards_region_check', sql`${table.region} IN ('US', 'DE')`),
+]);
 
 export const bills = pgTable('bills', {
   id: uuid('id').primaryKey(),

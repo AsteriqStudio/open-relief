@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+export const DemoCurrencySchema = z.enum(['USD', 'EUR']);
+export type DemoCurrency = z.infer<typeof DemoCurrencySchema>;
+
+export function formatCurrency(cents: number, currency: DemoCurrency = 'USD'): string {
+  z.number().int().safe().parse(cents);
+  const selected = DemoCurrencySchema.parse(currency);
+  return new Intl.NumberFormat(selected === 'EUR' ? 'de-DE' : 'en-US', { style: 'currency', currency: selected }).format(cents / 100);
+}
+
 export const DonationSplitInputSchema = z.object({
   billAmountCents: z.number().int().positive().safe(),
   coverProcessingFee: z.boolean(),

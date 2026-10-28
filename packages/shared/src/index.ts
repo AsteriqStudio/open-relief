@@ -4,3 +4,4 @@ export * from './schemas/transaction.js';
 export * from './schemas/vetting.js';
 export * from './schemas/legal.js';
 export * from './utils/feeEngine.js';
+export * from './pitchDeck.js';

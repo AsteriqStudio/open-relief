@@ -4,6 +4,9 @@ node_modules/
 .expo/
 dist/
 dist-web/
+apps/mobile/android/
+builds/*.apk
+builds/*.sha256
 coverage/
 .env
 .env.*

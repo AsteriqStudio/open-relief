@@ -17,6 +17,10 @@ const BillSchema = z.object({
   daysUntilDisconnection: z.number().int().nullable(),
   accountLast4: z.string().nullable(),
   sponsor: z.object({ id: z.string().uuid(), name: z.string(), matchRatio: z.number().positive(), remainingMatchBudgetCents: z.number().int().nonnegative(), remainingFeeBufferCents: z.number().int().nonnegative() }).nullable(),
+  currency: z.enum(['USD', 'EUR']).optional(),
+  locationLabel: z.string().optional(),
+  urgencyLabel: z.string().optional(),
+  railLabel: z.string().optional(),
 });
 
 export type FeedBill = z.infer<typeof BillSchema>;

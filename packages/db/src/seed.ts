@@ -12,6 +12,8 @@ const samples = [
   { id: '00000000-0000-4000-8000-000000000203', billerName: 'Chicago Gas Demo', merchantId: 'mock-gas-chicago', category: 'gas', zipCode: '60607', story: 'Chicago household with an overdue heating bill', account: 'DEMO-G-103', balance: 15_700 },
   { id: '00000000-0000-4000-8000-000000000204', billerName: 'Phoenix Electric Demo', merchantId: 'mock-electric-phoenix', category: 'electric', zipCode: '85004', story: 'Phoenix household needs help with electric service', account: 'DEMO-E-104', balance: 9_950 },
   { id: '00000000-0000-4000-8000-000000000205', billerName: 'Austin Water Demo', merchantId: 'mock-water-austin', category: 'water', zipCode: '78701', story: 'Austin household with an overdue water bill', account: 'DEMO-W-105', balance: 6_275 },
+  { id: '00000000-0000-4000-8000-000000000206', billerName: 'Community Hospital Demo', merchantId: 'mock-medical-hospital', category: 'medical', zipCode: '30303', story: 'Atlanta household with an overdue medical bill', account: 'DEMO-M-106', balance: 3_500 },
+  { id: '00000000-0000-4000-8000-000000000207', billerName: 'Community Telecom Demo', merchantId: 'mock-telecom-provider', category: 'telecom', zipCode: '98101', story: 'Seattle household with an overdue phone bill', account: 'DEMO-T-107', balance: 3_000 },
 ] as const;
 
 const { db, pool } = createDatabase();
@@ -52,7 +54,7 @@ try {
     await db.update(bills).set({ accountHolderName: 'Demo Recipient', isShutoffNotice: true, daysUntilDisconnection: 4 })
       .where(and(eq(bills.id, sample.id), isNull(bills.accountHolderName)));
   }
-  console.log('Seeded five demo bills and two demo users');
+  console.log('Seeded seven demo bills and two demo users');
 } finally {
   await pool.end();
 }

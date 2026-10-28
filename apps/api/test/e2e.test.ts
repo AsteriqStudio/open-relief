@@ -87,6 +87,10 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     assert.equal(metadata.exif, undefined);
     const feed = (await app.inject({ method: 'GET', url: '/api/bills/feed' })).json<{ bills: Array<{ id: string }> }>();
     assert.ok(feed.bills.some((bill) => bill.id === billId));
+    const electricFeed = (await app.inject({ method: 'GET', url: '/api/bills/feed?category=electric' })).json<{ bills: Array<{ id: string; category: string }> }>();
+    assert.ok(electricFeed.bills.some((bill) => bill.id === billId));
+    assert.ok(electricFeed.bills.every((bill) => bill.category === 'electric'));
+    assert.equal((await app.inject({ method: 'GET', url: '/api/bills/feed?category=unknown' })).statusCode, 400);
 
     const missingDonorTerms = await app.inject({ method: 'POST', url: '/api/donations/create-intent', headers: donorHeaders, payload: { billId, amountCents: 1000, coverProcessingFee: true, tipPercentage: 0 } });
     assert.equal(missingDonorTerms.statusCode, 400);

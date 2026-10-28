@@ -76,11 +76,11 @@ export function RecipientScreen() {
     <View className="mt-5 rounded-3xl border border-line bg-white p-5">
       <Text className="text-[11px] font-black tracking-widest text-pine">01  BILL DETAILS</Text>
       <Text className="mt-5 text-sm font-bold text-ink">Bill category</Text>
-      <View className="mt-3 flex-row flex-wrap gap-2">{(['electric', 'water', 'gas', 'medical'] as const).map((item) => <Pressable key={item} onPress={() => setCategory(item)} className={`rounded-full px-4 py-2.5 ${category === item ? 'bg-pine-dark' : 'bg-canvas'}`}><Text className={`font-bold capitalize ${category === item ? 'text-white' : 'text-ink'}`}>{item}</Text></Pressable>)}</View>
+      <View className="mt-3 flex-row flex-wrap gap-2">{(['electric', 'water', 'gas', 'medical', 'telecom'] as const).map((item) => <Pressable key={item} onPress={() => setCategory(item)} className={`rounded-full px-4 py-2.5 ${category === item ? 'bg-pine-dark' : 'bg-canvas'}`}><Text className={`font-bold capitalize ${category === item ? 'text-white' : 'text-ink'}`}>{item}</Text></Pressable>)}</View>
       <Text className="mt-5 text-sm font-bold text-ink">ZIP code</Text>
       <TextInput className="mt-2 rounded-xl border border-line bg-canvas p-4 text-ink" keyboardType="number-pad" maxLength={5} value={zipCode} onChangeText={setZipCode} />
       <Text className="mt-5 text-sm font-bold text-ink">Creditor shown on the bill</Text>
-      <TextInput className="mt-2 rounded-xl border border-line bg-canvas p-4 text-ink" placeholder="Utility or hospital name" value={declaredBillerName} onChangeText={(value) => { setDeclaredBillerName(value); setAttestationAccepted(false); }} />
+      <TextInput className="mt-2 rounded-xl border border-line bg-canvas p-4 text-ink" placeholder="Creditor name on your bill" value={declaredBillerName} onChangeText={(value) => { setDeclaredBillerName(value); setAttestationAccepted(false); }} />
       <Text className="mt-5 text-sm font-bold text-ink">Short anonymous story</Text>
       <TextInput className="mt-2 min-h-20 rounded-xl border border-line bg-canvas p-4 text-ink" multiline maxLength={240} value={story} onChangeText={setStory} />
     </View>

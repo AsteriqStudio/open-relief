@@ -7,7 +7,7 @@ const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? (Platform.OS === 'web' ? win
 const BillSchema = z.object({
   id: z.string().uuid(),
   billerName: z.string().nullable(),
-  category: z.enum(['electric', 'water', 'gas', 'medical']),
+  category: z.enum(['electric', 'water', 'gas', 'medical', 'telecom']),
   zipCode: z.string().nullable(),
   story: z.string().nullable(),
   statementBalanceCents: z.number().int().nullable(),
@@ -61,8 +61,8 @@ export async function signOut(token: string): Promise<void> {
   await request('/api/auth/logout', { method: 'POST' }, token);
 }
 
-export async function getFeed(): Promise<FeedBill[]> {
-  return z.object({ bills: z.array(BillSchema) }).parse(await request('/api/bills/feed')).bills;
+export async function getFeed(category?: FeedBill['category']): Promise<FeedBill[]> {
+  return z.object({ bills: z.array(BillSchema) }).parse(await request(`/api/bills/feed${category ? `?category=${category}` : ''}`)).bills;
 }
 
 export async function uploadBill(input: {

@@ -2,7 +2,7 @@ import { boolean, check, date, index, integer, jsonb, pgEnum, pgTable, real, tex
 import { sql } from 'drizzle-orm';
 
 export const userRole = pgEnum('user_role', ['recipient', 'donor', 'admin']);
-export const billCategory = pgEnum('bill_category', ['electric', 'water', 'gas', 'medical']);
+export const billCategory = pgEnum('bill_category', ['electric', 'water', 'gas', 'medical', 'telecom']);
 export const billStatus = pgEnum('bill_status', ['pending_ocr', 'pending_review', 'verified', 'funded', 'settled', 'rejected']);
 export const assistanceProgram = pgEnum('assistance_program', ['SNAP', 'MEDICAID', 'LIHEAP', 'NONE']);
 export const transactionStatus = pgEnum('transaction_status', ['pending', 'succeeded', 'failed']);

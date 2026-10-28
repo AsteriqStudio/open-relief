@@ -12,7 +12,7 @@ pnpm install --frozen-lockfile --store-dir "$PWD/.pnpm-store"
 bash scripts/start-local.sh
 ```
 
-The startup script creates an ignored `.env.local` with random local credentials if needed, starts PostgreSQL, Redis, and MinIO, applies migrations, seeds five demo bills, builds the server packages, and runs the API and OCR worker. It preserves an existing `.env.local`. Stop the foreground script to stop the API and worker; use `docker compose --env-file .env.local down` to stop local services. Data volumes remain until explicitly removed.
+The startup script creates an ignored `.env.local` with random local credentials if needed, starts PostgreSQL, Redis, and MinIO, applies migrations, seeds seven demo bills across electric, water, gas, medical, and telecom, builds the server packages, and runs the API and OCR worker. It preserves an existing `.env.local`. Stop the foreground script to stop the API and worker; use `docker compose --env-file .env.local down` to stop local services. Data volumes remain until explicitly removed.
 
 The API listens on `http://127.0.0.1:3000`. A successful `GET /health` returns `{"status":"ok"}`. `GET /api/bills/feed` lists the verified demo bills. Create a recipient or donor account in the mobile app to upload bills or simulate donations. Seeded demo users cannot sign in because they have no passwords.
 
@@ -34,7 +34,7 @@ The captured screens below come from the actual app running against the seeded l
 
 ![Mock checkout preview](docs/previews/checkout.png)
 
-More screens: [welcome](docs/previews/auth.png), [payment breakdown](docs/previews/checkout-summary.png), [confirmation](docs/previews/confirmation.png), and [recipient intake](docs/previews/recipient.png).
+More screens: [welcome](docs/previews/auth.png), [medical category](docs/previews/categories-medical.png), [telecom category](docs/previews/categories-telecom.png), [payment breakdown](docs/previews/checkout-summary.png), [confirmation](docs/previews/confirmation.png), and [recipient intake](docs/previews/recipient.png).
 
 ## Validate
 
@@ -68,7 +68,7 @@ The OCR worker defaults to `OCR_PROVIDER=mock`. Set `OCR_PROVIDER=textract` and 
 
 Before a bill enters the feed, the vetting service checks for shut-off or past-due language, a $600 UTC calendar-year aid limit, a 60-day cooldown after aid, and at least 80% account-holder name similarity. The yearly limit counts successful creditor payments and remaining balances of active verified bills; `lifetime_aid_cents` retains the historical total. Non-urgent or over-limit submissions are rejected. Cooldown, name mismatch, low OCR confidence, or an unverified merchant require manual review and stay off the feed. Recipient status responses explain rejection or review; donors see only verified or funded bills and a masked creditor account suffix.
 
-The donor app has a spring-driven swipe deck with haptics, an urgency indicator, a direct-creditor checkout sheet with preset or custom amounts, an unchanged fee split, and a confirmation card. A test PaymentSheet success first shows payment acceptance; the creditor confirmation appears only after the signed webhook records settlement. The app can share the non-deductible payment confirmation.
+The donor app has a spring-driven swipe deck with haptics, category filters for electric, water, gas, medical, and telecom bills, an urgency indicator, a direct-creditor checkout sheet with preset or custom amounts, an unchanged fee split, and a confirmation card. A test PaymentSheet success first shows payment acceptance; the creditor confirmation appears only after the signed webhook records settlement. The app can share the non-deductible payment confirmation.
 
 ## Admin review and legal acceptance
 
@@ -81,7 +81,7 @@ The admin API lists pending reviews with pagination, serves review previews and 
 ## Boundaries
 
 - Stripe test mode can present PaymentSheet with test cards, but no real funds move. The Method adapter is a local sandbox simulation and cannot disburse money.
-- The mock OCR adapter recognizes only a demo biller. Textract extraction can produce a bill for manual review, but it cannot approve a live creditor or route money.
+- The mock OCR adapter recognizes only a demo electric biller. Uploads in other categories stay in manual review until a category-matched demo creditor is independently verified; seeded medical and telecom bills demonstrate the donor flow. Textract extraction can produce a bill for manual review, but it cannot approve a live creditor or route money.
 - Authentication uses local password accounts and revocable database sessions. Names and assistance programs are self-reported, so the match is a review signal rather than proof of identity. Household linking, email verification, password recovery, abuse throttling, stronger admin enrollment, full document viewing in the mobile app, and delivered decision notifications are still required before public deployment. The API remains bound to loopback.
 - Payment confirmations make no tax-deductibility claim. Direct bill payments are not automatically charitable contributions, and the project has no verified 501(c)(3) status. The generated email payload is a payment confirmation, not a charitable tax receipt.
 - A future live design needs verified creditor routing, payment-provider coordination, authentication, privacy and fraud controls, and legal review. A Stripe charge followed by a separate disbursement does not alone establish that the platform avoids custody or money-transmission obligations.

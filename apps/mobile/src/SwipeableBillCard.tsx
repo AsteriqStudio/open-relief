@@ -53,14 +53,14 @@ export function SwipeableBillCard({ bill, onGive, onPass }: { bill: FeedBill; on
     <Animated.View style={[relieveStyle, { position: 'absolute', top: 4, right: 4, bottom: 4, left: 4 }]} className="items-end justify-center rounded-3xl bg-pine px-7"><Text className="text-2xl font-black tracking-widest text-white">RELIEVE →</Text></Animated.View>
     <Animated.View style={[passStyle, { position: 'absolute', top: 4, right: 4, bottom: 4, left: 4 }]} className="justify-center rounded-3xl bg-muted px-7"><Text className="text-2xl font-black tracking-widest text-white">← PASS</Text></Animated.View>
     <GestureDetector gesture={gesture}><Animated.View style={cardStyle} className="overflow-hidden rounded-3xl border border-line bg-white shadow-lg">
-      <View className="relative overflow-hidden bg-pine-dark px-5 pb-4 pt-4">
+      <View className="relative overflow-hidden bg-pine-dark px-5 pb-3 pt-3">
         <View className="absolute -right-12 -top-20 h-52 w-52 rounded-full border border-white/10" />
         <View className="absolute -right-1 -top-7 h-32 w-32 rounded-full border border-white/10" />
         <View className="flex-row items-center justify-between"><Text className="text-[11px] font-bold tracking-[2px] text-mint">VERIFIED DEMO BILL</Text><Text className="text-xs font-semibold text-white/70">{category}</Text></View>
-        <View className="mt-4 flex-row items-center"><View className="h-12 w-12 items-center justify-center rounded-xl bg-white/15"><Text className="text-base font-black text-white">{initials}</Text></View><View className="ml-3 flex-1"><Text className="text-xs font-medium text-white/70">Paying directly to</Text><Text className="mt-1 text-xl font-black text-white" numberOfLines={1}>{bill.billerName ?? 'Demo creditor'}</Text></View></View>
+        <View className="mt-3 flex-row items-center"><View className="h-12 w-12 items-center justify-center rounded-xl bg-white/15"><Text className="text-base font-black text-white">{initials}</Text></View><View className="ml-3 flex-1"><Text className="text-xs font-medium text-white/70">Paying directly to</Text><Text className="mt-1 text-base font-black text-white" numberOfLines={1}>{bill.billerName ?? 'Demo creditor'}</Text></View></View>
         <View className="mt-3 flex-row items-center justify-between border-t border-white/20 pt-3"><Text className="text-xs font-semibold text-mint">✓ Verified demo creditor</Text><Text className="text-xs text-white/70">Acct ••••{bill.accountLast4 ?? 'private'}</Text></View>
       </View>
-      <View className="px-5 pb-4 pt-4">
+      <View className="px-5 pb-3 pt-3">
         <View className="flex-row items-center justify-between"><View className="rounded-full bg-cream px-3 py-2"><Text className="text-xs font-bold text-amber">●  {urgency}</Text></View><Text className="text-xs font-medium text-muted">ZIP {bill.zipCode ?? 'private'}</Text></View>
         <Text className="mt-3 text-sm leading-6 text-ink" numberOfLines={3}>{bill.story?.trim() || `A household in ZIP ${bill.zipCode ?? 'your area'} needs help with an overdue ${bill.category} bill.`}</Text>
         <View className="mt-3 h-px bg-line" />

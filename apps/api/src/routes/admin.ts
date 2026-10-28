@@ -7,7 +7,7 @@ import { auditLogs, bills, transactions, users } from '@open-relief/db';
 import { LEGAL_TERMS_VERSION } from '@open-relief/shared';
 import { decryptAccountNumber } from '@open-relief/db/security/encryption';
 import type { registerAuth } from '../auth.js';
-import { isVerifiedDemoMerchantId } from '../biller/methodSandbox.js';
+import { isVerifiedDemoMerchantForCategory } from '../biller/methodSandbox.js';
 import { nameSimilarity } from '../services/vettingService.js';
 import type { Services } from '../services.js';
 import { renderPdfFirstPage } from '../pdfPreview.js';
@@ -80,7 +80,7 @@ export function registerAdminRoutes(app: FastifyInstance, services: Services, re
       if (bill.status !== 'pending_review') return reply.code(409).send({ error: 'Review has already been decided' });
       if (input.decision === 'approve') {
         if (!bill.termsAcceptedAt || bill.termsVersion !== LEGAL_TERMS_VERSION) return reply.code(409).send({ error: 'Current recipient attestation is required for approval' });
-        if (!bill.billerMerchantId || !isVerifiedDemoMerchantId(bill.billerMerchantId) || !bill.billerAccountEncrypted || !bill.statementBalanceCents || bill.remainingBalanceCents !== bill.statementBalanceCents) {
+        if (!bill.billerMerchantId || !isVerifiedDemoMerchantForCategory(bill.billerMerchantId, bill.category) || !bill.billerAccountEncrypted || !bill.statementBalanceCents || bill.remainingBalanceCents !== bill.statementBalanceCents) {
           return reply.code(409).send({ error: 'A verified demo creditor and intact bill balance are required for approval' });
         }
         decryptAccountNumber(bill.billerAccountEncrypted);

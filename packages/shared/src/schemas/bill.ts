@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const BillCategorySchema = z.enum(['electric', 'water', 'gas', 'medical']);
+export const BillCategorySchema = z.enum(['electric', 'water', 'gas', 'medical', 'telecom']);
 export const BillStatusSchema = z.enum(['pending_ocr', 'pending_review', 'verified', 'funded', 'settled', 'rejected']);
 
 export const BillSchema = z.object({

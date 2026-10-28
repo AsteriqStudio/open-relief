@@ -40,11 +40,11 @@ test('OCR ingestion rejects ineligible bills and keeps name mismatch in review',
   const services = await createServices(config);
   const app = buildApp(services);
   const image = await sharp({ create: { width: 4, height: 4, channels: 3, background: { r: 13, g: 113, b: 181 } } }).jpeg().toBuffer();
-  const createBill = async (recipientId: string, status: 'pending_ocr' | 'verified' = 'pending_ocr', balance = 12_000) => {
+  const createBill = async (recipientId: string, status: 'pending_ocr' | 'verified' = 'pending_ocr', balance = 12_000, category: 'electric' | 'telecom' = 'electric') => {
     const id = randomUUID();
     const documentKey = `vetting/${id}.jpg`;
     await services.db.insert(bills).values({
-      id, recipientId, category: 'electric', documentUrl: `s3://${config.S3_BUCKET}/${documentKey}`, documentKey,
+      id, recipientId, category, billerName: 'Demo Utility', documentUrl: `s3://${config.S3_BUCKET}/${documentKey}`, documentKey,
       documentMimeType: 'image/jpeg', documentSizeBytes: image.length, status,
       ...(status === 'verified' ? { statementBalanceCents: balance, remainingBalanceCents: balance, billerName: 'Demo Utility', billerMerchantId: 'mock-demo-utility', billerAccountEncrypted: encryptAccountNumber(`DEMO-${id}`) } : {}),
     });
@@ -56,11 +56,11 @@ test('OCR ingestion rejects ineligible bills and keeps name mismatch in review',
     await services.db.insert(users).values({ id, role: 'recipient', email: `${id}@example.invalid`, phone: '+15555550122', legalName: 'Demo Recipient' });
     return id;
   };
-  const run = async (noticeText: string, accountHolderName: string, activeBalance = 0, lastAidAt: Date | null = null) => {
+  const run = async (noticeText: string, accountHolderName: string, activeBalance = 0, lastAidAt: Date | null = null, category: 'electric' | 'telecom' = 'electric') => {
     const recipientId = await createUser();
     if (lastAidAt) await services.db.update(users).set({ lastAidAt }).where(eq(users.id, recipientId));
     if (activeBalance) await createBill(recipientId, 'verified', activeBalance);
-    const billId = await createBill(recipientId);
+    const billId = await createBill(recipientId, 'pending_ocr', 12_000, category);
     await processUploadedBill(billId, services, { async extract() {
       return { billerName: 'Demo Utility', accountNumber: `DEMO-${billId}`, dueDate: '2026-12-15', statementBalanceCents: 12_000,
         confidence: 98, merchantId: 'mock-demo-utility', accountHolderName, noticeText };
@@ -86,6 +86,9 @@ test('OCR ingestion rejects ineligible bills and keeps name mismatch in review',
     const eligible = await run('FINAL NOTICE: Disconnection in 4 days', 'Demo Recipient');
     assert.equal(eligible.status, 'verified');
     assert.equal(eligible.daysUntilDisconnection, 4);
+    const wrongCategory = await run('FINAL NOTICE: Disconnection in 4 days', 'Demo Recipient', 0, null, 'telecom');
+    assert.equal(wrongCategory.status, 'pending_review');
+    assert.equal(wrongCategory.billerMerchantId, null);
   } finally {
     await app.close();
     await services.close();

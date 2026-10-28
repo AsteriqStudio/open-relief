@@ -1,0 +1,1 @@
+ALTER TYPE "public"."bill_category" ADD VALUE 'telecom';

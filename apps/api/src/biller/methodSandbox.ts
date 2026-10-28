@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
+import type { BillCategory } from '@open-relief/shared';
 import type { IMethodBillerClient } from '../payments.js';
 
 export const METHOD_SANDBOX_BASE_URL = 'https://dev.methodfi.com/v1';
@@ -13,17 +14,23 @@ const SandboxPaymentInputSchema = z.object({
 }).strict();
 
 const demoMerchants = [
-  { id: 'mock-electric-detroit', name: 'DTE Energy demo', routingNumber: '100000001' },
-  { id: 'mock-water-flint', name: 'Flint Water demo', routingNumber: '100000002' },
-  { id: 'mock-gas-chicago', name: 'Chicago Gas demo', routingNumber: '100000003' },
-  { id: 'mock-electric-phoenix', name: 'Phoenix Electric demo', routingNumber: '100000004' },
-  { id: 'mock-water-austin', name: 'Austin Water demo', routingNumber: '100000005' },
-  { id: 'mock-electric-coned', name: 'ConEd demo', routingNumber: '100000006' },
-  { id: 'mock-demo-utility', name: 'Demo Utility', routingNumber: '100000007' },
+  { id: 'mock-electric-detroit', name: 'DTE Energy demo', routingNumber: '100000001', category: 'electric' },
+  { id: 'mock-water-flint', name: 'Flint Water demo', routingNumber: '100000002', category: 'water' },
+  { id: 'mock-gas-chicago', name: 'Chicago Gas demo', routingNumber: '100000003', category: 'gas' },
+  { id: 'mock-electric-phoenix', name: 'Phoenix Electric demo', routingNumber: '100000004', category: 'electric' },
+  { id: 'mock-water-austin', name: 'Austin Water demo', routingNumber: '100000005', category: 'water' },
+  { id: 'mock-electric-coned', name: 'ConEd demo', routingNumber: '100000006', category: 'electric' },
+  { id: 'mock-demo-utility', name: 'Demo Utility', routingNumber: '100000007', category: 'electric' },
+  { id: 'mock-medical-hospital', name: 'Community Hospital demo', routingNumber: '100000008', category: 'medical' },
+  { id: 'mock-telecom-provider', name: 'Community Telecom demo', routingNumber: '100000009', category: 'telecom' },
 ] as const;
 
 export function isVerifiedDemoMerchantId(id: string): boolean {
   return demoMerchants.some((merchant) => merchant.id === id);
+}
+
+export function isVerifiedDemoMerchantForCategory(id: string, category: BillCategory): boolean {
+  return demoMerchants.some((merchant) => merchant.id === id && merchant.category === category);
 }
 
 /** Deterministic local simulation of Method's sandbox bill-pay contract. No HTTP or funds move. */

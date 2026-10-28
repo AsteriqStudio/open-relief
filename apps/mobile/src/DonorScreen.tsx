@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Share, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { getDonationReceipt, getFeed } from './api';
@@ -9,6 +9,8 @@ import type { CheckoutConfirmation } from './CheckoutSheet';
 import { SwipeableBillCard } from './SwipeableBillCard';
 
 const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+const categoryFilters = ['all', 'electric', 'water', 'gas', 'medical', 'telecom'] as const;
+type CategoryFilter = typeof categoryFilters[number];
 
 function ImpactCelebration({ confirmation, receipt, onClose }: { confirmation: CheckoutConfirmation; receipt: DonationReceipt | null; onClose(): void }) {
   const scale = useSharedValue(0.82);
@@ -36,20 +38,23 @@ function ImpactCelebration({ confirmation, receipt, onClose }: { confirmation: C
 export function DonorScreen() {
   const [bills, setBills] = useState<FeedBill[]>([]);
   const [index, setIndex] = useState(0);
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
   const [selectedBill, setSelectedBill] = useState<FeedBill | null>(null);
   const [confirmation, setConfirmation] = useState<CheckoutConfirmation | null>(null);
   const [receipt, setReceipt] = useState<DonationReceipt | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const feedRequest = useRef(0);
   const { token } = useAuth();
 
   async function refresh() {
+    const requestId = ++feedRequest.current;
     setLoading(true);
-    try { setBills(await getFeed()); setIndex(0); setError(null); }
-    catch (failure) { setError(failure instanceof Error ? failure.message : 'Could not load bills'); }
-    finally { setLoading(false); }
+    try { const nextBills = await getFeed(categoryFilter === 'all' ? undefined : categoryFilter); if (requestId === feedRequest.current) { setBills(nextBills); setIndex(0); setError(null); } }
+    catch (failure) { if (requestId === feedRequest.current) setError(failure instanceof Error ? failure.message : 'Could not load bills'); }
+    finally { if (requestId === feedRequest.current) setLoading(false); }
   }
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => { void refresh(); }, [categoryFilter]);
 
   function handleComplete(nextConfirmation: CheckoutConfirmation) {
     setConfirmation(nextConfirmation);
@@ -69,15 +74,19 @@ export function DonorScreen() {
     })().catch((failure: unknown) => setError(failure instanceof Error ? failure.message : 'Could not refresh payment status'));
   }
 
-  const current = bills[index];
+  const visibleBills = bills;
+  const current = visibleBills[index];
   return <View className="flex-1 bg-canvas"><ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 36 }}>
     <Text className="text-[11px] font-black tracking-widest text-pine">DIRECT HELP, REAL RELIEF</Text>
-    <Text className="mt-2 text-4xl font-black leading-[42px] text-ink">Pay a bill.{"\n"}Lift a weight.</Text>
-    <Text className="mt-2 text-sm leading-5 text-muted">Choose a reviewed demo bill. Pay the creditor directly, never the recipient.</Text>
-    <View className="mt-4 flex-row items-center"><View className="h-6 w-6 items-center justify-center rounded-full bg-mint"><Text className="text-xs font-black text-pine">✓</Text></View><Text className="ml-2 text-xs font-semibold text-pine-dark">Reviewed before it reaches your feed</Text></View>
+    <Text className="mt-2 text-3xl font-black leading-9 text-ink">Pay a bill.{"\n"}Lift a weight.</Text>
+    <Text className="mt-1 text-sm leading-5 text-muted">Choose a reviewed demo bill. Pay the creditor directly, never the recipient.</Text>
+    <View className="mt-3 flex-row items-center"><View className="h-6 w-6 items-center justify-center rounded-full bg-mint"><Text className="text-xs font-black text-pine">✓</Text></View><Text className="ml-2 text-xs font-semibold text-pine-dark">Reviewed before it reaches your feed</Text></View>
     {confirmation ? <ImpactCelebration confirmation={confirmation} receipt={receipt} onClose={() => setConfirmation(null)} />
-      : <View className="mt-3"><View className="flex-row items-center justify-between"><Text className="text-xs font-black tracking-widest text-pine">BILLS NEEDING HELP</Text><Text className="text-xs font-bold text-muted">{loading ? 'Loading' : `${Math.min(index + 1, bills.length)} / ${bills.length}`}</Text></View>
-        {loading ? <View className="mt-5 rounded-3xl bg-white p-10"><ActivityIndicator color="#176B5D" /></View> : current ? <SwipeableBillCard key={`${current.id}-${selectedBill ? 'open' : 'closed'}`} bill={current} onGive={() => setSelectedBill(current)} onPass={() => setIndex((value) => value + 1)} /> : <View className="mt-5 rounded-3xl border border-line bg-white p-7"><Text className="text-2xl font-black text-ink">You are all caught up.</Text><Text className="mt-2 text-sm leading-6 text-muted">Check back for more verified demo bills.</Text><Pressable onPress={() => void refresh()} className="mt-6 rounded-2xl bg-pine p-4"><Text className="text-center font-bold text-white">Refresh feed</Text></Pressable></View>}</View>}
+      : <View className="mt-3"><View className="flex-row items-center justify-between"><Text className="text-xs font-black tracking-widest text-pine">BILLS NEEDING HELP</Text><Text className="text-xs font-bold text-muted">{loading ? 'Loading' : `${visibleBills.length === 0 ? 0 : Math.min(index + 1, visibleBills.length)} / ${visibleBills.length}`}</Text></View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-5 mt-3" contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
+          {categoryFilters.map((option) => <Pressable key={option} accessibilityRole="button" accessibilityState={{ selected: categoryFilter === option }} onPress={() => { setCategoryFilter(option); setIndex(0); }} className={`rounded-full border px-4 py-2.5 ${categoryFilter === option ? 'border-pine-dark bg-pine-dark' : 'border-line bg-white'}`}><Text className={`text-xs font-bold capitalize ${categoryFilter === option ? 'text-white' : 'text-ink'}`}>{option === 'all' ? 'All bills' : option}</Text></Pressable>)}
+        </ScrollView>
+        {loading ? <View className="mt-5 rounded-3xl bg-white p-10"><ActivityIndicator color="#176B5D" /></View> : current ? <SwipeableBillCard key={`${current.id}-${selectedBill ? 'open' : 'closed'}`} bill={current} onGive={() => setSelectedBill(current)} onPass={() => setIndex((value) => value + 1)} /> : <View className="mt-5 rounded-3xl border border-line bg-white p-7"><Text className="text-2xl font-black text-ink">{visibleBills.length === 0 ? `No ${categoryFilter === 'all' ? '' : `${categoryFilter} `}bills right now.` : 'You are all caught up.'}</Text><Text className="mt-2 text-sm leading-6 text-muted">Choose another category or check back for more verified demo bills.</Text><Pressable onPress={() => void refresh()} className="mt-6 rounded-2xl bg-pine p-4"><Text className="text-center font-bold text-white">Refresh feed</Text></Pressable></View>}</View>}
     {error && <Text className="mt-4 text-sm font-medium text-red-700">{error}</Text>}
   </ScrollView>
     <CheckoutSheet bill={selectedBill} onClose={() => setSelectedBill(null)} onComplete={handleComplete} />

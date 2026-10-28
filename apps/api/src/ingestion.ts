@@ -8,6 +8,7 @@ import { encryptAccountNumber } from '@open-relief/db/security/encryption';
 import type { IOCRExtractor } from './ocr.js';
 import type { Services } from './services.js';
 import { assessBillEligibility } from './services/vettingService.js';
+import { isVerifiedDemoMerchantForCategory } from './biller/methodSandbox.js';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const MIME_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
@@ -62,7 +63,9 @@ export async function processUploadedBill(billId: string, services: Services, ex
       lastAidAt: recipient.lastAidAt,
       now,
     });
-    const needsOcrReview = result.confidence < 85 || !result.merchantId;
+    const merchantId = result.merchantId && isVerifiedDemoMerchantForCategory(result.merchantId, bill.category)
+      && bill.billerName?.trim().toLowerCase() === result.billerName.trim().toLowerCase() ? result.merchantId : null;
+    const needsOcrReview = result.confidence < 85 || !merchantId;
     const nextStatus = duplicate ? 'rejected' : vetting.outcome === 'rejected' ? 'rejected' : needsOcrReview || vetting.outcome === 'pending_review' ? 'pending_review' : 'verified';
     const rejectionReason = duplicate ? 'This bill appears to duplicate a recent submission.' : vetting.reason ?? (needsOcrReview ? 'The creditor or document needs manual review.' : null);
     await tx.update(bills).set({
@@ -71,7 +74,7 @@ export async function processUploadedBill(billId: string, services: Services, ex
       isShutoffNotice: vetting.isShutoffNotice,
       daysUntilDisconnection: vetting.daysUntilDisconnection,
       rejectionReason,
-      billerMerchantId: result.merchantId,
+      billerMerchantId: merchantId,
       billerAccountEncrypted: encryptAccountNumber(result.accountNumber),
       accountHash,
       duplicateFingerprint: fingerprint,

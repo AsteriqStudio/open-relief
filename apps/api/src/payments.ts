@@ -5,6 +5,7 @@ import { auditLogs, bills, transactions, users } from '@open-relief/db';
 import { decryptAccountNumber } from '@open-relief/db/security/encryption';
 import { calculateDonationSplit, DonationSplitInputSchema, LEGAL_TERMS_VERSION, LegalAcceptanceSchema } from '@open-relief/shared';
 import type { Services } from './services.js';
+import { isVerifiedDemoMerchantForCategory } from './biller/methodSandbox.js';
 
 export const CreateIntentSchema = DonationSplitInputSchema.extend({
   billId: z.string().uuid(),
@@ -70,7 +71,7 @@ export async function createDonationIntent(input: z.infer<typeof CreateIntentSch
     const [donor] = await tx.select({ id: users.id }).from(users).where(and(eq(users.id, request.donorId), eq(users.role, 'donor')));
     if (!donor) throw new Error('Donor not found');
     const [bill] = await tx.select().from(bills).where(eq(bills.id, request.billId)).for('update');
-    if (!bill || !['verified', 'funded'].includes(bill.status) || !bill.billerMerchantId || !bill.billerAccountEncrypted || bill.remainingBalanceCents === null) {
+    if (!bill || !['verified', 'funded'].includes(bill.status) || !bill.billerMerchantId || !isVerifiedDemoMerchantForCategory(bill.billerMerchantId, bill.category) || !bill.billerAccountEncrypted || bill.remainingBalanceCents === null) {
       throw new Error('Bill is not available for donation');
     }
     const [reservation] = await tx.select({ amount: sum(transactions.amountToBillCents) }).from(transactions).where(and(
@@ -158,7 +159,7 @@ export async function settlePayment(intentId: string, services: Services, method
     if (transaction.status === 'succeeded') return { transactionId: transaction.id, alreadyProcessed: true };
     if (transaction.status !== 'pending' || (!verified && transaction.expiresAt < new Date())) throw new Error('Payment intent is not active');
     const [bill] = await tx.select().from(bills).where(eq(bills.id, transaction.billId)).for('update');
-    if (!bill?.billerMerchantId || !bill.billerAccountEncrypted || bill.remainingBalanceCents === null || bill.remainingBalanceCents < transaction.amountToBillCents) {
+    if (!bill?.billerMerchantId || !isVerifiedDemoMerchantForCategory(bill.billerMerchantId, bill.category) || !bill.billerAccountEncrypted || bill.remainingBalanceCents === null || bill.remainingBalanceCents < transaction.amountToBillCents) {
       throw new Error('Bill cannot be settled');
     }
     const methodDisbursementId = await method.disburse({

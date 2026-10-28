@@ -1,18 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import { HeadObjectCommand } from '@aws-sdk/client-s3';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
-import { desc, eq, inArray } from 'drizzle-orm';
+import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { bills } from '@open-relief/db';
 import { decryptAccountNumber } from '@open-relief/db/security/encryption';
-import { LEGAL_TERMS_VERSION, LegalAcceptanceSchema } from '@open-relief/shared';
+import { BillCategorySchema, LEGAL_TERMS_VERSION, LegalAcceptanceSchema } from '@open-relief/shared';
 import type { registerAuth } from '../auth.js';
 import type { Services } from '../services.js';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const UploadRequestSchema = z.object({
-  category: z.enum(['electric', 'water', 'gas', 'medical']),
+  category: z.enum(['electric', 'water', 'gas', 'medical', 'telecom']),
   mimeType: z.enum(['image/jpeg', 'image/png', 'application/pdf']),
   sizeBytes: z.number().int().positive().max(MAX_BYTES),
   zipCode: z.string().regex(/^\d{5}$/),
@@ -21,6 +21,7 @@ const UploadRequestSchema = z.object({
   attestation: LegalAcceptanceSchema,
 }).strict();
 const BillIdSchema = z.object({ id: z.string().uuid() });
+const FeedQuerySchema = z.object({ category: BillCategorySchema.optional() }).strict();
 
 export function registerBillRoutes(app: FastifyInstance, services: Services, requireAuth: ReturnType<typeof registerAuth>) {
   app.post('/api/bills/upload-url', { preHandler: requireAuth({ roles: ['recipient'] }) }, async (request, reply) => {
@@ -75,13 +76,14 @@ export function registerBillRoutes(app: FastifyInstance, services: Services, req
     return { id: bill.id, status: bill.status, remainingBalanceCents: bill.remainingBalanceCents, rejectionReason: bill.recipientId === request.user!.id || request.user!.role === 'admin' ? bill.rejectionReason : null };
   });
 
-  app.get('/api/bills/feed', async () => {
+  app.get('/api/bills/feed', async (request) => {
+    const query = FeedQuerySchema.parse(request.query);
     const rows = await services.db.select({
       id: bills.id, billerName: bills.billerName, category: bills.category, zipCode: bills.zipCode, story: bills.story,
       statementBalanceCents: bills.statementBalanceCents, remainingBalanceCents: bills.remainingBalanceCents, status: bills.status,
       isShutoffNotice: bills.isShutoffNotice, daysUntilDisconnection: bills.daysUntilDisconnection,
       billerAccountEncrypted: bills.billerAccountEncrypted,
-    }).from(bills).where(inArray(bills.status, ['verified', 'funded'])).orderBy(desc(bills.createdAt)).limit(50);
+    }).from(bills).where(and(inArray(bills.status, ['verified', 'funded']), query.category ? eq(bills.category, query.category) : undefined)).orderBy(desc(bills.createdAt)).limit(50);
     return { bills: rows.map(({ billerAccountEncrypted, ...bill }) => ({
       ...bill,
       accountLast4: billerAccountEncrypted ? decryptAccountNumber(billerAccountEncrypted).slice(-4) : null,

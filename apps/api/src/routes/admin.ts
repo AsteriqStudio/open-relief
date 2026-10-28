@@ -10,6 +10,7 @@ import type { registerAuth } from '../auth.js';
 import { isVerifiedDemoMerchantId } from '../biller/methodSandbox.js';
 import { nameSimilarity } from '../services/vettingService.js';
 import type { Services } from '../services.js';
+import { renderPdfFirstPage } from '../pdfPreview.js';
 
 const PageSchema = z.object({ page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(50).default(20) }).strict();
 const IdSchema = z.object({ id: z.string().uuid() });
@@ -48,6 +49,25 @@ export function registerAdminRoutes(app: FastifyInstance, services: Services, re
     const object = await services.s3.send(new GetObjectCommand({ Bucket: services.config.S3_BUCKET, Key: bill.documentKey }));
     if (!object.Body) return reply.code(404).send({ error: 'Review document not found' });
     const bytes = await object.Body.transformToByteArray();
+    return reply.header('cache-control', 'no-store').type(bill.mimeType).send(Buffer.from(bytes));
+  });
+
+  app.get('/api/admin/reviews/:id/preview', { preHandler: adminOnly }, async (request, reply) => {
+    const { id } = IdSchema.parse(request.params);
+    const [bill] = await services.db.select({ documentKey: bills.documentKey, mimeType: bills.documentMimeType, status: bills.status }).from(bills).where(eq(bills.id, id));
+    if (!bill || bill.status !== 'pending_review') return reply.code(404).send({ error: 'Review preview not found' });
+    const object = await services.s3.send(new GetObjectCommand({ Bucket: services.config.S3_BUCKET, Key: bill.documentKey }));
+    if (!object.Body) return reply.code(404).send({ error: 'Review preview not found' });
+    if (object.ContentLength && object.ContentLength > 10 * 1024 * 1024) return reply.code(413).send({ error: 'Review document exceeds size limit' });
+    const bytes = await object.Body.transformToByteArray();
+    if (bytes.length > 10 * 1024 * 1024) return reply.code(413).send({ error: 'Review document exceeds size limit' });
+    if (bill.mimeType === 'application/pdf') {
+      let preview: Buffer;
+      try { preview = await renderPdfFirstPage(bytes); }
+      catch { return reply.code(422).send({ error: 'PDF preview could not be rendered' }); }
+      return reply.header('cache-control', 'no-store').type('image/png').send(preview);
+    }
+    if (bill.mimeType !== 'image/jpeg' && bill.mimeType !== 'image/png') return reply.code(415).send({ error: 'Unsupported review document type' });
     return reply.header('cache-control', 'no-store').type(bill.mimeType).send(Buffer.from(bytes));
   });
 

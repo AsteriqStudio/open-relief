@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { adminDocumentSource, decideReview, getPendingReviews } from './api';
+import { adminPreviewSource, decideReview, getPendingReviews } from './api';
 import type { AdminReview } from './api';
 import { useAuth } from './AuthContext';
 
@@ -11,8 +11,11 @@ function ReviewCard({ review, token, onDecided }: { review: AdminReview; token: 
   const [notes, setNotes] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [previewLoaded, setPreviewLoaded] = useState(false);
+  const [previewFailed, setPreviewFailed] = useState(false);
   async function decide(decision: 'approve' | 'reject') {
     if (busy) return;
+    if (decision === 'approve' && !previewLoaded) { setError('Review the document preview before approval.'); return; }
     const finalNotes = decision === 'approve' ? notes.trim() || 'Reviewed document and verified demo creditor' : notes.trim();
     if (finalNotes.length < 5) { setError('Choose or enter a rejection reason.'); return; }
     setBusy(true); setError(null);
@@ -20,14 +23,13 @@ function ReviewCard({ review, token, onDecided }: { review: AdminReview; token: 
     catch (failure) { setError(failure instanceof Error ? failure.message : 'Decision failed'); }
     finally { setBusy(false); }
   }
-  const isImage = review.documentMimeType === 'image/jpeg' || review.documentMimeType === 'image/png';
   return <View className="mb-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
     <Text className="text-xs font-bold uppercase tracking-widest text-amber-700">Manual review</Text>
     <Text className="mt-2 text-xl font-black text-slate-900">{review.billerName ?? 'Unidentified creditor'}</Text>
     <Text className="mt-2 text-sm text-slate-600">{review.recipientEmail} · {dollars(review.statementBalanceCents)}</Text>
-    <View className="mt-4 overflow-hidden rounded-2xl border-2 border-slate-800 bg-white">{isImage
-      ? <Image source={adminDocumentSource(review.billId, token)} resizeMode="contain" style={{ width: '100%', height: 220 }} />
-      : <View className="h-40 items-center justify-center bg-slate-900 p-5"><Text className="text-center text-lg font-bold text-white">PDF document</Text><Text className="mt-2 text-center text-xs text-slate-200">Image preview is unavailable for this file. Review extracted data and open the original in an approved document viewer before approval.</Text></View>}</View>
+    <View className="mt-4 overflow-hidden rounded-2xl border-2 border-slate-800 bg-white"><Image source={adminPreviewSource(review.billId, token)} resizeMode="contain" style={{ width: '100%', height: 220 }} onLoad={() => { setPreviewLoaded(true); setPreviewFailed(false); }} onError={() => { setPreviewLoaded(false); setPreviewFailed(true); }} /></View>
+    <Text className="mt-2 text-xs text-slate-500">{review.documentMimeType === 'application/pdf' ? 'First page of PDF' : 'Uploaded bill image'} · Full document available through the admin document API.</Text>
+    {previewFailed && <Text className="mt-2 text-sm text-red-700">Preview unavailable. Approval is disabled until the document can be inspected.</Text>}
     <View className="mt-4 rounded-2xl bg-slate-50 p-4"><Text className="text-xs font-bold uppercase text-slate-500">Name comparison</Text><Text className="mt-2 text-sm text-slate-800">Recipient: {review.recipientLegalName ?? 'Missing'}</Text><Text className="mt-1 text-sm text-slate-800">Bill account holder: {review.accountHolderName ?? 'Missing'}</Text><Text className={`mt-2 text-lg font-black ${review.nameMatchPercentage !== null && review.nameMatchPercentage < 80 ? 'text-red-700' : 'text-emerald-700'}`}>{review.nameMatchPercentage === null ? 'Match unavailable' : `${review.nameMatchPercentage}% match`}</Text></View>
     <Text className="mt-4 text-sm text-slate-700">Flag: {review.rejectionReason ?? 'Manual document review'}</Text>
     <Text className="mt-2 text-xs text-slate-500">OCR confidence: {review.ocrConfidence ?? 'Unknown'}% · Shut-off: {review.daysUntilDisconnection === null ? 'Date unknown' : `${review.daysUntilDisconnection} days`}</Text>
@@ -35,7 +37,7 @@ function ReviewCard({ review, token, onDecided }: { review: AdminReview; token: 
     <View className="mt-2 flex-row flex-wrap gap-2">{rejectionOptions.map((option) => <Pressable key={option} onPress={() => setNotes(option)} className="rounded-full bg-slate-100 px-3 py-2"><Text className="text-xs font-semibold text-slate-700">{option}</Text></Pressable>)}</View>
     <TextInput className="mt-3 rounded-xl border border-slate-300 bg-white p-3" placeholder="Reason or verification evidence" value={notes} onChangeText={setNotes} multiline maxLength={1000} />
     {error && <Text className="mt-3 text-sm text-red-700">{error}</Text>}
-    <Pressable disabled={busy} onPress={() => void decide('approve')} className={`mt-4 rounded-2xl p-4 ${busy ? 'bg-slate-400' : 'bg-emerald-700'}`}><Text className="text-center font-bold text-white">✓ Approve & Add to Feed</Text></Pressable>
+    <Pressable disabled={busy || !previewLoaded} onPress={() => void decide('approve')} className={`mt-4 rounded-2xl p-4 ${busy || !previewLoaded ? 'bg-slate-400' : 'bg-emerald-700'}`}><Text className="text-center font-bold text-white">✓ Approve & Add to Feed</Text></Pressable>
     <Pressable disabled={busy} onPress={() => void decide('reject')} className="mt-3 rounded-2xl border border-red-700 p-4"><Text className="text-center font-bold text-red-800">✕ Reject with Reason</Text></Pressable>
   </View>;
 }

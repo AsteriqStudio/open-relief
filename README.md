@@ -4,7 +4,7 @@ A local, zero-cash **demo** for direct-to-creditor mutual aid. Recipients submit
 
 ## Run locally
 
-Use Node.js 22 or newer, pnpm 11.25, and Docker Compose.
+Use Node.js 22 or newer, pnpm 11.25, Docker Compose, and Poppler's `pdftoppm` command for admin PDF previews.
 
 ```bash
 export XDG_DATA_HOME="$PWD/.local/share"
@@ -63,12 +63,12 @@ Recipients must name the creditor and accept the versioned attestation before th
 
 Admin accounts cannot be created through public signup. For a local admin, provide `ADMIN_EMAIL`, `ADMIN_PASSWORD` (at least 12 characters), and `ADMIN_PHONE` through the local shell or secure environment settings, load `.env.local`, then run `pnpm --filter @open-relief/api bootstrap-admin`. The command refuses to run with `NODE_ENV=production` and refuses to elevate an existing email. Sign in with that account through the mobile app. In development builds, Profile can switch between previously authenticated recipient, donor, and admin accounts; switching verifies the stored session with the server and never changes the account's role.
 
-The admin API lists pending reviews with pagination, serves review images to authenticated admins, and records approve or reject decisions in the audit log. Approval requires the current recipient attestation, an allowlisted demo creditor, an intact balance, and room under the annual aid limit. Rejection stores the stated reason. The API formats a recipient notification payload but does not send email. The mobile screen previews JPEG and PNG files; PDF files require an approved document viewer before a reviewer can inspect the original.
+The admin API lists pending reviews with pagination, serves review previews and original documents to authenticated admins, and records approve or reject decisions in the audit log. Approval requires the current recipient attestation, an allowlisted demo creditor, an intact balance, and room under the annual aid limit. Rejection stores the stated reason. The API formats a recipient notification payload but does not send email. The mobile screen previews JPEG and PNG files and the first page of PDF files. PDF reviewers should inspect the original document through the admin document API when it has more than one page.
 
 ## Boundaries
 
 - Stripe test mode can present PaymentSheet with test cards, but no real funds move. The Method adapter is a local sandbox simulation and cannot disburse money.
 - The mock OCR adapter recognizes only a demo biller. Textract extraction can produce a bill for manual review, but it cannot approve a live creditor or route money.
-- Authentication uses local password accounts and revocable database sessions. Names and assistance programs are self-reported, so the match is a review signal rather than proof of identity. Household linking, email verification, password recovery, abuse throttling, stronger admin enrollment, PDF review support, and delivered decision notifications are still required before public deployment. The API remains bound to loopback.
+- Authentication uses local password accounts and revocable database sessions. Names and assistance programs are self-reported, so the match is a review signal rather than proof of identity. Household linking, email verification, password recovery, abuse throttling, stronger admin enrollment, full document viewing in the mobile app, and delivered decision notifications are still required before public deployment. The API remains bound to loopback.
 - Payment confirmations make no tax-deductibility claim. Direct bill payments are not automatically charitable contributions, and the project has no verified 501(c)(3) status. The generated email payload is a payment confirmation, not a charitable tax receipt.
 - A future live design needs verified creditor routing, payment-provider coordination, authentication, privacy and fraud controls, and legal review. A Stripe charge followed by a separate disbursement does not alone establish that the platform avoids custody or money-transmission obligations.

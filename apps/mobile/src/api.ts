@@ -156,3 +156,7 @@ export async function decideReview(billId: string, decision: 'approve' | 'reject
 export function adminDocumentSource(billId: string, token: string): { uri: string; headers: Record<string, string> } {
   return { uri: `${API_BASE}/api/admin/reviews/${billId}/document`, headers: { Authorization: `Bearer ${token}` } };
 }
+
+export function adminPreviewSource(billId: string, token: string): { uri: string; headers: Record<string, string> } {
+  return { uri: `${API_BASE}/api/admin/reviews/${billId}/preview`, headers: { Authorization: `Bearer ${token}` } };
+}

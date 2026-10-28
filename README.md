@@ -36,7 +36,7 @@ The captured screens below come from the actual app running against the seeded l
 
 ![Mock checkout preview](docs/previews/checkout.png)
 
-More screens: [welcome](docs/previews/auth.png), [medical category](docs/previews/categories-medical.png), [telecom category](docs/previews/categories-telecom.png), [payment breakdown](docs/previews/checkout-summary.png), [confirmation](docs/previews/confirmation.png), and [recipient intake](docs/previews/recipient.png).
+More screens: [welcome](docs/previews/auth.png), [medical category](docs/previews/categories-medical.png), [telecom sponsor badge](docs/previews/sponsored-telecom.png), [sponsor checkout](docs/previews/sponsor-checkout.png), [sponsor confirmation](docs/previews/sponsor-confirmation.png), [payment breakdown](docs/previews/checkout-summary.png), [confirmation](docs/previews/confirmation.png), and [recipient intake](docs/previews/recipient.png).
 
 ## Validate
 
@@ -59,6 +59,12 @@ The end-to-end test uploads a JPEG through the presigned form, checks EXIF remov
 Mock mode remains the default. To enable Stripe test PaymentIntents, set `STRIPE_SECRET_KEY=sk_test_...` and `STRIPE_WEBHOOK_SECRET=whsec_...` in the API environment. Set `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...` when bundling the mobile app. Only test keys are accepted. Route Stripe test webhooks to `POST /api/webhooks/stripe` using Stripe's test webhook signing secret. A native Expo development build is required for PaymentSheet; Expo Go does not contain the Stripe native module. The local demo completion endpoint accepts mock intents only.
 
 The backend computes the existing fee split before creating a test intent. Webhooks validate Stripe's signature, payment amount, currency, and donation metadata. A successful event sends a deterministic simulated payment to an allowlisted demo creditor, records the Stripe charge and Method style `pmt_...` reference, and updates the bill in one database transaction. `METHOD_PROVIDER=sandbox` enables the same local Method sandbox simulator in mock Stripe mode. It models `https://dev.methodfi.com/v1` but makes no outbound Method API call or funds transfer. The receipt email payload is stored with the transaction; no email is sent.
+
+## Sponsor matching sandbox
+
+The seed includes a fictional 1:1 telecom sponsor pool with a separate match budget and processing-fee buffer. Donor checkout shows an estimated match. Intent creation reserves the selected pool's match and fee buffer with an atomic conditional database update, and the bill reservation counts both donor and sponsor principal. If the advertised match changes before reservation, the API returns HTTP 409 so the donor can refresh before paying. The signed success webhook settles the combined amount to the verified demo creditor and marks the allocation settled. Signed failure or cancellation events release reserved balances; the expiry worker releases mock intents and checks Stripe **test-mode** intent status before resolving expired test reservations. Webhook replay does not spend the pool twice.
+
+When a donor declines processing-fee coverage, the sponsor fee buffer must cover the estimated card fee; otherwise the API returns HTTP 422 and checkout asks the donor to cover it. Creditor principal is never reduced to pay fees. The approved 15% sponsor management retainer is calculated separately from the matching budget and is not charged or invoiced by this sandbox. No sponsor deposits, float interest, or live transfers are implemented. A sponsor pool row is a fictional demo ledger balance, not evidence of funded cash.
 
 ## Authentication and OCR modes
 

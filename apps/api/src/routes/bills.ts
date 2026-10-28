@@ -1,10 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import { HeadObjectCommand } from '@aws-sdk/client-s3';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { bills } from '@open-relief/db';
+import { bills, sponsorshipPools } from '@open-relief/db';
 import { decryptAccountNumber } from '@open-relief/db/security/encryption';
 import { BillCategorySchema, LEGAL_TERMS_VERSION, LegalAcceptanceSchema } from '@open-relief/shared';
 import type { registerAuth } from '../auth.js';
@@ -78,6 +78,7 @@ export function registerBillRoutes(app: FastifyInstance, services: Services, req
 
   app.get('/api/bills/feed', async (request) => {
     const query = FeedQuerySchema.parse(request.query);
+    const pools = await services.db.select().from(sponsorshipPools).where(eq(sponsorshipPools.active, true)).orderBy(asc(sponsorshipPools.createdAt));
     const rows = await services.db.select({
       id: bills.id, billerName: bills.billerName, category: bills.category, zipCode: bills.zipCode, story: bills.story,
       statementBalanceCents: bills.statementBalanceCents, remainingBalanceCents: bills.remainingBalanceCents, status: bills.status,
@@ -87,6 +88,10 @@ export function registerBillRoutes(app: FastifyInstance, services: Services, req
     return { bills: rows.map(({ billerAccountEncrypted, ...bill }) => ({
       ...bill,
       accountLast4: billerAccountEncrypted ? decryptAccountNumber(billerAccountEncrypted).slice(-4) : null,
+      sponsor: (() => {
+        const pool = pools.find((candidate) => (candidate.targetCategory === null || candidate.targetCategory === bill.category) && (candidate.remainingMatchBudgetCents > 0 || candidate.remainingFeeBufferCents > 0));
+        return pool ? { id: pool.id, name: pool.sponsorName, matchRatio: Number(pool.matchRatio), remainingMatchBudgetCents: pool.remainingMatchBudgetCents, remainingFeeBufferCents: pool.remainingFeeBufferCents } : null;
+      })(),
     })) };
   });
 }

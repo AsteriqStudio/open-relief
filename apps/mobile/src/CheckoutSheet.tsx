@@ -3,14 +3,14 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useStripe } from './stripeAdapter';
 import * as Haptics from 'expo-haptics';
-import { BRAND_NOTICE, calculateDonationSplit, donorGiftDisclosure } from '@open-relief/shared';
+import { BRAND_NOTICE, calculateSponsoredDonationSplit, calculateSponsorMatchCents, donorGiftDisclosure } from '@open-relief/shared';
 import { completeMockDonation, createDonationIntent } from './api';
 import type { DonationIntent, FeedBill } from './api';
 import { useAuth } from './AuthContext';
 import { LegalModal } from './LegalModal';
 import type { LegalDocument } from './LegalModal';
 
-export type CheckoutConfirmation = { billId: string; transactionId: string; amountCents: number; mode: 'mock' | 'test'; billerName: string; accountLast4: string | null };
+export type CheckoutConfirmation = { billId: string; transactionId: string; amountCents: number; sponsorMatchCents: number; sponsorName: string | null; mode: 'mock' | 'test'; billerName: string; accountLast4: string | null };
 const dollars = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
 function StripePaymentPresenter({ intent, onSuccess, onFailure }: { intent: DonationIntent; onSuccess(): void; onFailure(message: string): void }) {
@@ -63,9 +63,13 @@ export function CheckoutSheet({ bill, onClose, onComplete }: { bill: FeedBill | 
   const amountError = customAmount && (amountCents === null || amountCents <= 0 || amountCents > remaining)
     ? 'Enter an amount greater than $0 and no more than the remaining balance.' : null;
   const validAmount = amountCents !== null && amountCents > 0 && amountCents <= remaining && !amountError;
-  const split = useMemo(() => validAmount && amountCents !== null && tipPercentage !== null
-    ? calculateDonationSplit({ billAmountCents: amountCents, coverProcessingFee, tipPercentage }) : null,
-  [amountCents, coverProcessingFee, tipPercentage, validAmount]);
+  const split = useMemo(() => {
+    if (!validAmount || amountCents === null || tipPercentage === null) return null;
+    const sponsor = bill?.sponsor;
+    const desiredMatch = sponsor ? calculateSponsorMatchCents(amountCents, sponsor.matchRatio, Math.max(0, remaining - amountCents)) : 0;
+    const sponsorMatchCents = sponsor && sponsor.remainingMatchBudgetCents >= desiredMatch ? desiredMatch : 0;
+    return calculateSponsoredDonationSplit({ billAmountCents: amountCents, coverProcessingFee, tipPercentage, sponsorMatchCents, feeBufferAvailableCents: sponsor?.remainingFeeBufferCents ?? 0 });
+  }, [amountCents, bill?.sponsor, coverProcessingFee, remaining, tipPercentage, validAmount]);
 
   function finish(confirmation: CheckoutConfirmation) {
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -76,13 +80,13 @@ export function CheckoutSheet({ bill, onClose, onComplete }: { bill: FeedBill | 
   }
 
   async function donate() {
-    if (!bill || !validAmount || amountCents === null || !split || tipPercentage === null || !donorTermsAccepted || !token || busy) return;
+    if (!bill || !validAmount || amountCents === null || !split || split.requiresDonorFeeCoverage || tipPercentage === null || !donorTermsAccepted || !token || busy) return;
     setBusy(true);
     setError(null);
     let waitingForSheet = false;
     try {
-      const intent = await createDonationIntent({ billId: bill.id, amountCents, coverProcessingFee, tipPercentage, donorTermsAccepted: true }, token);
-      const confirmation: CheckoutConfirmation = { billId: bill.id, transactionId: intent.transactionId, amountCents, mode: intent.mode, billerName: bill.billerName ?? 'demo creditor', accountLast4: bill.accountLast4 };
+      const intent = await createDonationIntent({ billId: bill.id, amountCents, coverProcessingFee, tipPercentage, ...(bill.sponsor ? { sponsorPoolId: bill.sponsor.id } : {}), expectedSponsorMatchCents: split.sponsorMatchCents, donorTermsAccepted: true }, token);
+      const confirmation: CheckoutConfirmation = { billId: bill.id, transactionId: intent.transactionId, amountCents, sponsorMatchCents: intent.feeBreakdown.sponsorMatchCents, sponsorName: intent.sponsorName, mode: intent.mode, billerName: bill.billerName ?? 'demo creditor', accountLast4: bill.accountLast4 };
       if (intent.mode === 'mock') {
         await completeMockDonation(intent.transactionId, token);
         finish(confirmation);
@@ -116,13 +120,15 @@ export function CheckoutSheet({ bill, onClose, onComplete }: { bill: FeedBill | 
         {amountError && <Text className="mt-2 text-sm text-red-700">{amountError}</Text>}
       </View>
       <Pressable accessibilityRole="switch" accessibilityState={{ checked: coverProcessingFee }} onPress={() => setCoverProcessingFee((value) => !value)} className="mt-4 flex-row items-center rounded-3xl border border-line bg-mint p-5"><View className={`mr-4 h-7 w-7 items-center justify-center rounded-lg ${coverProcessingFee ? 'bg-pine' : 'border border-muted bg-white'}`}><Text className="font-black text-white">{coverProcessingFee ? '✓' : ''}</Text></View><View className="flex-1"><Text className="font-black text-ink">Cover card processing {split ? `(${dollars(split.processingFeeCoveredCents)})` : ''}</Text><Text className="mt-1 text-xs leading-5 text-muted">Adds the estimated processing fee to your test total.</Text></View></Pressable>
+      {split?.requiresDonorFeeCoverage && <View className="mt-3 rounded-2xl bg-cream p-4"><Text className="text-sm font-bold leading-5 text-amber">Sponsor fee buffer depleted. Please cover card processing to proceed.</Text></View>}
+      {split?.feeCoverageSource === 'sponsor_buffer' && <Text className="mt-2 text-xs text-pine">{bill?.sponsor?.name} covers the estimated {dollars(split.feeBufferAppliedCents)} processing fee.</Text>}
       <View className="mt-4 rounded-3xl border border-line bg-white p-5"><Text className="text-[11px] font-bold tracking-widest text-pine">02  OPTIONAL PLATFORM TIP</Text><Text className="mt-2 text-sm leading-5 text-muted">Your choice helps run this demo. Zero is always welcome.</Text><View className="mt-4 flex-row rounded-xl bg-canvas p-1">{([0, 10, 15, 20] as const).map((value) => <Pressable key={value} accessibilityRole="button" onPress={() => setTipPercentage(value)} className={`min-h-11 flex-1 items-center justify-center rounded-lg ${tipPercentage === value ? 'bg-white shadow-sm' : ''}`}><Text className={`font-black ${tipPercentage === value ? 'text-pine-dark' : 'text-muted'}`}>{value}%</Text></Pressable>)}</View></View>
-      {split && <View className="mt-4 rounded-3xl border border-line bg-white p-5"><Text className="text-[11px] font-bold tracking-widest text-pine">03  REVIEW YOUR PAYMENT</Text><Text className="mt-2 text-xl font-black text-ink">Every dollar, accounted for.</Text><View className="mt-5 flex-row justify-between"><Text className="text-sm text-muted">To creditor</Text><Text className="font-bold text-ink">{dollars(split.netPaymentToBillerCents)}</Text></View><View className="mt-3 flex-row justify-between"><Text className="text-sm text-muted">Estimated processing fee</Text><Text className="font-bold text-ink">{dollars(split.stripeFeeCents)}</Text></View><View className="mt-3 flex-row justify-between"><Text className="text-sm text-muted">Fee you cover</Text><Text className="font-bold text-ink">{dollars(split.processingFeeCoveredCents)}</Text></View><View className="mt-3 flex-row justify-between"><Text className="text-sm text-muted">Platform tip</Text><Text className="font-bold text-ink">{dollars(split.platformTipCents)}</Text></View><View className="mt-5 h-px bg-line" /><View className="mt-4 flex-row justify-between"><Text className="text-base font-black text-ink">Total test charge</Text><Text className="text-lg font-black text-pine-dark">{dollars(split.totalChargeCents)}</Text></View></View>}
+      {split && <View className="mt-4 rounded-3xl border border-line bg-white p-5"><Text className="text-[11px] font-bold tracking-widest text-pine">03  REVIEW YOUR PAYMENT</Text><Text className="mt-2 text-xl font-black text-ink">Every dollar, accounted for.</Text><View className="mt-5 flex-row justify-between"><Text className="text-sm text-muted">Your contribution</Text><Text className="font-bold text-ink">{dollars(amountCents ?? 0)}</Text></View>{split.sponsorMatchCents > 0 && <View className="mt-3 flex-row justify-between"><Text className="flex-1 text-sm text-muted">Estimated match · {bill?.sponsor?.name}</Text><Text className="font-bold text-pine">+{dollars(split.sponsorMatchCents)}</Text></View>}<View className="mt-3 flex-row justify-between"><Text className="text-sm font-bold text-ink">Total to creditor</Text><Text className="font-bold text-ink">{dollars(split.totalDisbursementToCreditorCents)}</Text></View><View className="mt-3 flex-row justify-between"><Text className="text-sm text-muted">Estimated processing fee</Text><Text className="font-bold text-ink">{dollars(split.stripeFeeCents)}</Text></View><View className="mt-3 flex-row justify-between"><Text className="text-sm text-muted">Fee you cover</Text><Text className="font-bold text-ink">{dollars(split.processingFeeCoveredCents)}</Text></View><View className="mt-3 flex-row justify-between"><Text className="text-sm text-muted">Platform tip</Text><Text className="font-bold text-ink">{dollars(split.platformTipCents)}</Text></View><View className="mt-5 h-px bg-line" /><View className="mt-4 flex-row justify-between"><Text className="text-base font-black text-ink">Total test charge</Text><Text className="text-lg font-black text-pine-dark">{dollars(split.totalChargeCents)}</Text></View></View>}
       <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: donorTermsAccepted }} onPress={() => setDonorTermsAccepted((value) => !value)} className="mt-4 flex-row rounded-3xl border border-line bg-white p-5"><View className={`mr-3 h-7 w-7 items-center justify-center rounded-lg ${donorTermsAccepted ? 'bg-pine' : 'border border-line bg-canvas'}`}><Text className="font-black text-white">{donorTermsAccepted ? '✓' : ''}</Text></View><Text className="flex-1 text-sm leading-6 text-muted">{donorGiftDisclosure(bill?.billerName ?? 'the demo creditor')}</Text></Pressable>
       <View className="mt-4 rounded-2xl bg-cream p-4"><Text className="text-[11px] font-black tracking-widest text-amber">ABOUT THIS GIFT</Text><Text className="mt-2 text-xs leading-5 text-ink">{BRAND_NOTICE}</Text><Pressable accessibilityRole="button" onPress={() => setLegalDocument('payment')} className="mt-3 self-start"><Text className="text-xs font-bold text-pine">Payment & legal details  →</Text></Pressable></View>
       <View className="mt-4 flex-row gap-5"><Pressable onPress={() => setLegalDocument('terms')}><Text className="text-sm font-bold text-pine">Terms of service</Text></Pressable><Pressable onPress={() => setLegalDocument('privacy')}><Text className="text-sm font-bold text-pine">Privacy notice</Text></Pressable></View>
       {error && <Text className="mt-4 text-sm text-red-700">{error}</Text>}
-      <Pressable accessibilityRole="button" disabled={!split || !donorTermsAccepted || busy} onPress={() => void donate()} className={`mt-6 min-h-14 items-center justify-center rounded-2xl p-4 ${split && donorTermsAccepted && !busy ? 'bg-pine' : 'bg-muted'}`}><Text className="text-center text-base font-black text-white">{busy ? 'Preparing payment…' : split ? `Continue · ${dollars(split.totalChargeCents)}  →` : 'Choose an amount and tip'}</Text></Pressable>
+      <Pressable accessibilityRole="button" disabled={!split || split.requiresDonorFeeCoverage || !donorTermsAccepted || busy} onPress={() => void donate()} className={`mt-6 min-h-14 items-center justify-center rounded-2xl p-4 ${split && !split.requiresDonorFeeCoverage && donorTermsAccepted && !busy ? 'bg-pine' : 'bg-muted'}`}><Text className="text-center text-base font-black text-white">{busy ? 'Preparing payment…' : split?.requiresDonorFeeCoverage ? 'Cover processing to continue' : split ? `Continue · ${dollars(split.totalChargeCents)}  →` : 'Choose an amount and tip'}</Text></Pressable>
       {pendingTestIntent && <StripePaymentPresenter intent={pendingTestIntent.intent} onSuccess={() => finish(pendingTestIntent.confirmation)} onFailure={(message) => { setPendingTestIntent(null); setBusy(false); setError(message); }} />}
       <Text className="mt-4 text-center text-xs leading-5 text-muted">Sandbox only. Mock mode records a simulated creditor payment. Confirmations are not charitable tax receipts.</Text>
       <LegalModal document={legalDocument} onClose={() => setLegalDocument(null)} />

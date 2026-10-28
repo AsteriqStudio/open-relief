@@ -16,6 +16,7 @@ const BillSchema = z.object({
   isShutoffNotice: z.boolean(),
   daysUntilDisconnection: z.number().int().nullable(),
   accountLast4: z.string().nullable(),
+  sponsor: z.object({ id: z.string().uuid(), name: z.string(), matchRatio: z.number().positive(), remainingMatchBudgetCents: z.number().int().nonnegative(), remainingFeeBufferCents: z.number().int().nonnegative() }).nullable(),
 });
 
 export type FeedBill = z.infer<typeof BillSchema>;
@@ -23,10 +24,12 @@ const AuthUserSchema = z.object({ id: z.string().uuid(), role: z.enum(['recipien
 const FeeBreakdownSchema = z.object({
   totalChargeCents: z.number().int(), netPaymentToBillerCents: z.number().int(), stripeFeeCents: z.number().int(),
   processingFeeCoveredCents: z.number().int(), platformTipCents: z.number().int(), netPlatformTipCents: z.number().int(),
+  donorChargeCents: z.number().int(), sponsorMatchCents: z.number().int(), totalDisbursementToCreditorCents: z.number().int(),
+  feeCoverageSource: z.enum(['donor', 'sponsor_buffer', 'none']), feeBufferAppliedCents: z.number().int(), requiresDonorFeeCoverage: z.boolean(),
 });
 const DonationIntentSchema = z.object({
   transactionId: z.string().uuid(), paymentIntentId: z.string().min(1), clientSecret: z.string().min(1),
-  feeBreakdown: FeeBreakdownSchema, mode: z.enum(['mock', 'test']),
+  feeBreakdown: FeeBreakdownSchema, mode: z.enum(['mock', 'test']), sponsorName: z.string().nullable(), allocationId: z.string().uuid().nullable(),
 });
 export type DonationIntent = z.infer<typeof DonationIntentSchema>;
 const SessionSchema = z.object({ token: z.string().min(1), expiresAt: z.string().datetime(), user: AuthUserSchema });
@@ -108,6 +111,8 @@ export async function createDonationIntent(input: {
   amountCents: number;
   coverProcessingFee: boolean;
   tipPercentage: number;
+  sponsorPoolId?: string;
+  expectedSponsorMatchCents?: number;
   donorTermsAccepted: true;
 }, token: string): Promise<DonationIntent> {
   return DonationIntentSchema.parse(await request('/api/donations/create-intent', {
@@ -126,6 +131,10 @@ const DonationReceiptSchema = z.object({
   billerName: z.string().nullable(),
   accountLast4: z.string().nullable(),
   amountToBillCents: z.number().int(),
+  donorPrincipalCents: z.number().int(),
+  sponsorMatchCents: z.number().int(),
+  sponsorName: z.string().nullable(),
+  feeBufferAppliedCents: z.number().int(),
   totalChargeCents: z.number().int(),
   methodDisbursementId: z.string().nullable(),
   taxNotice: z.string(),

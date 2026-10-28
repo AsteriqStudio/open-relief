@@ -62,6 +62,7 @@ export function SwipeableBillCard({ bill, onGive, onPass }: { bill: FeedBill; on
       </View>
       <View className="px-5 pb-3 pt-3">
         <View className="flex-row items-center justify-between"><View className="rounded-full bg-cream px-3 py-2"><Text className="text-xs font-bold text-amber">●  {urgency}</Text></View><Text className="text-xs font-medium text-muted">ZIP {bill.zipCode ?? 'private'}</Text></View>
+        {bill.sponsor && bill.sponsor.remainingMatchBudgetCents > 0 && remaining > 1 && <View className="mt-3 self-start rounded-full bg-mint px-3 py-2"><Text className="text-xs font-bold text-pine-dark">⚡ Up to {Number((1 + bill.sponsor.matchRatio).toFixed(2))}x impact · {bill.sponsor.name}</Text></View>}
         <Text className="mt-3 text-sm leading-6 text-ink" numberOfLines={3}>{bill.story?.trim() || `A household in ZIP ${bill.zipCode ?? 'your area'} needs help with an overdue ${bill.category} bill.`}</Text>
         <View className="mt-3 h-px bg-line" />
         <View className="mt-3 flex-row items-end justify-between"><View><Text className="text-[11px] font-bold tracking-widest text-muted">STILL NEEDED</Text><Text className="mt-1 text-3xl font-black text-ink">{dollars(remaining)}</Text></View><Text className="pb-1 text-sm font-bold text-pine">{progress}% funded</Text></View>

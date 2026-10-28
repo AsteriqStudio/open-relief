@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { GetObjectCommand } from '@aws-sdk/client-s3';
-import { and, asc, count, eq, gte, inArray, lt, sum } from 'drizzle-orm';
+import { and, asc, count, eq, gte, inArray, lt, sql, sum } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { auditLogs, bills, transactions, users } from '@open-relief/db';
@@ -89,7 +89,7 @@ export function registerAdminRoutes(app: FastifyInstance, services: Services, re
         const now = new Date();
         const yearStart = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
         const nextYearStart = new Date(Date.UTC(now.getUTCFullYear() + 1, 0, 1));
-        const [aid] = await tx.select({ total: sum(transactions.amountToBillCents) }).from(transactions)
+        const [aid] = await tx.select({ total: sum(sql`${transactions.amountToBillCents} + ${transactions.sponsorMatchCents}`) }).from(transactions)
           .innerJoin(bills, eq(transactions.billId, bills.id))
           .where(and(eq(bills.recipientId, recipient.id), eq(transactions.status, 'succeeded'), gte(transactions.updatedAt, yearStart), lt(transactions.updatedAt, nextYearStart)));
         const [active] = await tx.select({ total: sum(bills.remainingBalanceCents) }).from(bills)

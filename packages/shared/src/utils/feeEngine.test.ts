@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { calculateDonationSplit } from './feeEngine.js';
+import { calculateDonationSplit, calculateSponsoredDonationSplit, calculateSponsorMatchCents, calculateSponsorRetainerCents } from './feeEngine.js';
 
 test('covered processing preserves principal and net tip', () => {
   assert.deepEqual(calculateDonationSplit({ billAmountCents: 10_000, tipPercentage: 10, coverProcessingFee: true }), {
@@ -26,4 +26,21 @@ test('rejects invalid and unsafe amounts', () => {
   assert.throws(() => calculateDonationSplit({ billAmountCents: 0, tipPercentage: 0, coverProcessingFee: true }));
   assert.throws(() => calculateDonationSplit({ billAmountCents: 100, tipPercentage: -1, coverProcessingFee: true }));
   assert.throws(() => calculateDonationSplit({ billAmountCents: Number.MAX_SAFE_INTEGER, tipPercentage: 100, coverProcessingFee: true }));
+});
+
+test('sponsor match increases creditor principal without changing donor card fee math', () => {
+  assert.equal(calculateSponsorMatchCents(5_000, 1, 5_000), 5_000);
+  assert.equal(calculateSponsorMatchCents(5_000, 1, 2_000), 2_000);
+  const covered = calculateSponsoredDonationSplit({ billAmountCents: 5_000, sponsorMatchCents: 5_000, coverProcessingFee: true, tipPercentage: 0, feeBufferAvailableCents: 0 });
+  assert.equal(covered.donorChargeCents, 5_180);
+  assert.equal(covered.totalDisbursementToCreditorCents, 10_000);
+  assert.equal(covered.feeCoverageSource, 'donor');
+  const sponsorCovered = calculateSponsoredDonationSplit({ billAmountCents: 5_000, sponsorMatchCents: 5_000, coverProcessingFee: false, tipPercentage: 0, feeBufferAvailableCents: 175 });
+  assert.equal(sponsorCovered.donorChargeCents, 5_000);
+  assert.equal(sponsorCovered.stripeProcessingFeeCents, 175);
+  assert.equal(sponsorCovered.feeBufferAppliedCents, 175);
+  assert.equal(sponsorCovered.netPlatformTipCents, 0);
+  assert.equal(sponsorCovered.requiresDonorFeeCoverage, false);
+  assert.equal(calculateSponsoredDonationSplit({ billAmountCents: 5_000, sponsorMatchCents: 5_000, coverProcessingFee: false, tipPercentage: 0, feeBufferAvailableCents: 174 }).requiresDonorFeeCoverage, true);
+  assert.equal(calculateSponsorRetainerCents(5_000_000), 750_000);
 });

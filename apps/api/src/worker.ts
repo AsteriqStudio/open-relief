@@ -3,6 +3,8 @@ import { Redis } from 'ioredis';
 import { ApiConfigSchema } from './config.js';
 import { processUploadedBill } from './ingestion.js';
 import { createOCRExtractor } from './ocr.js';
+import { reconcileExpiredReservations } from './payments.js';
+import { createMethodBillerClient } from './webhooks/stripe.js';
 import { BILL_QUEUE_NAME, createServices } from './services.js';
 
 const config = ApiConfigSchema.parse(process.env);
@@ -17,8 +19,11 @@ const worker = new Worker(BILL_QUEUE_NAME, async (job) => {
 
 worker.on('failed', (job, error) => console.error(`OCR job ${job?.id ?? 'unknown'} failed: ${error.message}`));
 console.log(`OCR worker running with ${config.OCR_PROVIDER} extractor`);
+const expiryTimer = setInterval(() => { void reconcileExpiredReservations(services, services.testPayments, createMethodBillerClient(config)).catch((error: unknown) => console.error('Reservation expiry sweep failed:', error)); }, 60_000);
+expiryTimer.unref();
 
 async function shutdown() {
+  clearInterval(expiryTimer);
   await worker.close();
   await services.close();
   await redis.quit();

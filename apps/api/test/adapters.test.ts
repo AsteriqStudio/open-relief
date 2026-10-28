@@ -137,7 +137,7 @@ test('signed Stripe test events settle partial and full bills once through Metho
     const replay = await sendSucceeded(partial, partialMetadata);
     assert.equal(replay.statusCode, 200, replay.body);
     assert.equal(replay.json<{ settlement: { alreadyProcessed: boolean } }>().settlement.alreadyProcessed, true);
-    const full = await createDonationIntent({ billId, donorId, billAmountCents: 7_500, coverProcessingFee: false, tipPercentage: 20, idempotencyKey: randomUUID(), donorAcceptance }, services, fakeStripeClient);
+    const full = await createDonationIntent({ billId, donorId, billAmountCents: 7_500, coverProcessingFee: true, tipPercentage: 20, idempotencyKey: randomUUID(), donorAcceptance }, services, fakeStripeClient);
     const second = await sendSucceeded(full, full.metadata!);
     assert.equal(second.statusCode, 200, second.body);
     const [bill] = await services.db.select().from(bills).where(eq(bills.id, billId));

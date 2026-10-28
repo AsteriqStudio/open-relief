@@ -11,25 +11,32 @@ Update this file when a task changes status. Keep implementation claims tied to 
 - [x] Expo donor, recipient, and admin flows; browser preview; Android and web exports.
 - [x] Electric, water, gas, medical, and telecom categories in schemas, uploads, demo seeds, and donor filters. Category-mismatched mock OCR results cannot authorize a creditor payment.
 - [x] Versioned sandbox recipient and donor acceptance, Terms and Privacy drafts, and non-deductible payment confirmation.
+- [x] Fictional sponsorship pools, atomic match and fee-buffer reservations, signed Stripe test-mode settlement, failure release, and expiry reconciliation.
 
 ## Current request
 
 - [x] Initialize this progress tracker.
 - [x] Confirm telecom and all other requested categories across the sandbox.
 - [x] Add sandbox brand and payment-policy disclosures to checkout, confirmation, and settings; verify the app.
-- [ ] Design corporate sponsorship and matching pools. Financial approval required before changing fee allocation or implementing sponsor-funded settlement.
-- [ ] Design zero-tip deficit funding. Financial approval required before changing the existing fee formula or reducing creditor payout.
+- [x] Phase 10: Add sponsorship pool and allocation schema with nonnegative balance checks and category targeting.
+- [x] Phase 10: Preserve the approved donor card-fee calculation; add 1:1 sponsor matching and a separate 15% retainer calculator.
+- [x] Phase 10: Reserve pool balances atomically, settle combined creditor principal, and release failed or canceled allocations.
+- [x] Phase 10: Reconcile expired mock intents and verify Stripe test-mode intent status before releasing or settling expired test reservations.
+- [x] Phase 10: Show sponsor badge, match estimate, actual receipt split, and depleted-buffer warning in the mobile UI.
+- [x] Phase 10: Complete final typecheck, tests, Android export, and web export.
+- [x] Phase 10: Commit and push the verified release candidate to `feature/sandbox-mvp`.
 
 ## Verification record
 
-- `pnpm typecheck` — passed after the current edits.
-- `pnpm test` — 15 passed after the current edits.
-- Android and web Expo exports — passed after the current edits.
-- Browser check — mock checkout, confirmation disclosure, and settings legal modal passed on a phone-width viewport with no page errors.
+- `pnpm typecheck` — passed after the Phase 10 implementation and receipt changes.
+- `pnpm test` — 18 tests passed after the Phase 10 implementation and receipt changes.
+- Android and web Expo exports — passed after the Phase 10 implementation and receipt changes.
+- Browser check — telecom sponsor badge, $7.50 + $7.50 checkout, matched confirmation, and depleted-buffer guard passed on a phone-width viewport with no page errors.
 
 ## Boundaries and next gates
 
-- The approved fee engine always assigns the requested bill amount to the creditor. With a $100 bill payment and no tip, covering the fee makes the total test charge **$103.30** with an estimated $3.30 fee; without coverage, the charge is **$100.00**, the estimated fee is $3.20, and the platform share is **negative $3.20**. No reserve funding or payout reduction is implemented.
-- Sponsor matching, management fees, infrastructure buffers, and default tip or fee-allocation changes require the session's financial approval gate. A sponsor float earning treasury yield would require holding sponsor funds and conflicts with the current zero-cash design; it is outside this implementation.
+- The Phase 10 user authorization allows sandbox matching, separate 15% sponsor retainer calculation, and a fictional sponsor fee buffer. The approved card-fee formula still charges **$103.30** for a $100 gift with no tip when the donor covers the estimated $3.30 fee. If the donor does not cover processing, a sponsor buffer must reserve the $3.20 estimated fee or checkout is rejected with HTTP 422. The creditor always receives full donor principal plus any reserved sponsor match.
+- The 15% B2B retainer is out of band: the sandbox calculates it but does not invoice, receive, or transfer it. Sponsor pools are fictional ledger entries; no sponsor funds are held and no float interest is earned.
+- The test-mode expiry worker verifies provider status before releasing an expired test reservation. Actual Stripe test keys and native PaymentSheet have not been exercised in this environment; tests use signed fixtures. Live payment operations remain behind a separate financial approval gate.
 - The demo has no executed agent-of-the-payee agreement and makes no money-transmitter exemption claim. Legal copy remains a draft for qualified review.
 - Public deployment still needs independently verified creditor routing, payment-provider and legal arrangements, stronger authentication and fraud controls, delivered notifications, and a successful cloud environment publication.

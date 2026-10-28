@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { and, eq, isNull } from 'drizzle-orm';
-import { createDatabase, bills, users } from './index.js';
+import { createDatabase, bills, sponsorshipPools, users } from './index.js';
 import { encryptAccountNumber } from './security/encryption.js';
 
 const recipientId = '00000000-0000-4000-8000-000000000101';
@@ -54,7 +54,17 @@ try {
     await db.update(bills).set({ accountHolderName: 'Demo Recipient', isShutoffNotice: true, daysUntilDisconnection: 4 })
       .where(and(eq(bills.id, sample.id), isNull(bills.accountHolderName)));
   }
-  console.log('Seeded seven demo bills and two demo users');
+  await db.insert(sponsorshipPools).values({
+    id: '00000000-0000-4000-8000-000000000301',
+    sponsorName: 'Community Partner Demo',
+    matchRatio: '1.00',
+    totalMatchBudgetCents: 50_000,
+    remainingMatchBudgetCents: 50_000,
+    totalFeeBufferCents: 2_000,
+    remainingFeeBufferCents: 2_000,
+    targetCategory: 'telecom',
+  }).onConflictDoNothing();
+  console.log('Seeded seven demo bills, two demo users, and one fictional sponsor pool');
 } finally {
   await pool.end();
 }

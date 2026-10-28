@@ -3,6 +3,8 @@ import { Queue } from 'bullmq';
 import { Redis } from 'ioredis';
 import { createDatabase } from '@open-relief/db';
 import type { ApiConfig } from './config.js';
+import type { ITestPaymentReconciler } from './payments.js';
+import { createStripeTestReconciler } from './stripeTest.js';
 
 export const BILL_QUEUE_NAME = 'bill-ocr';
 export type Database = ReturnType<typeof createDatabase>['db'];
@@ -12,6 +14,7 @@ export interface Services {
   s3: S3Client;
   queue: Queue;
   config: ApiConfig;
+  testPayments?: ITestPaymentReconciler;
   close(): Promise<void>;
 }
 
@@ -35,6 +38,7 @@ export async function createServices(config: ApiConfig): Promise<Services> {
     }
     return {
       db, s3, queue, config,
+      ...(config.STRIPE_SECRET_KEY ? { testPayments: createStripeTestReconciler(config.STRIPE_SECRET_KEY) } : {}),
       async close() {
         await Promise.all([queue.close(), redis.quit(), pool.end()]);
         s3.destroy();

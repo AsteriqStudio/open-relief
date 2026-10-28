@@ -24,10 +24,10 @@ export function verifyStripeWebhook(payload: Buffer, signature: string, config: 
   if (!config.STRIPE_WEBHOOK_SECRET) throw new Error('Stripe test webhook secret is required');
   const stripe = new Stripe(config.STRIPE_SECRET_KEY);
   const event = stripe.webhooks.constructEvent(payload, signature, config.STRIPE_WEBHOOK_SECRET);
-  if (event.type !== 'payment_intent.succeeded' && event.type !== 'payment_intent.payment_failed') {
+  if (event.type !== 'payment_intent.succeeded' && event.type !== 'payment_intent.payment_failed' && event.type !== 'payment_intent.canceled') {
     return { id: event.id, type: 'ignored' as const, data: { object: { id: '' } } };
   }
-  if (event.type === 'payment_intent.payment_failed') {
+  if (event.type === 'payment_intent.payment_failed' || event.type === 'payment_intent.canceled') {
     return { id: event.id, type: event.type, data: { object: { id: event.data.object.id } } };
   }
   const intent = SucceededIntentSchema.parse(event.data.object);
@@ -45,7 +45,15 @@ export function verifyStripeWebhook(payload: Buffer, signature: string, config: 
 
 export async function handleVerifiedStripeEvent(event: ReturnType<typeof verifyStripeWebhook>, services: Services) {
   if (event.type === 'ignored') return { received: true };
-  if (event.type === 'payment_intent.payment_failed') {
+  if (event.type === 'payment_intent.payment_failed' || event.type === 'payment_intent.canceled') {
+    if (event.type === 'payment_intent.payment_failed' && services.config.STRIPE_SECRET_KEY) {
+      if (!services.testPayments) throw new Error('Stripe test reconciliation client is required');
+      const current = await services.testPayments.retrieve(event.data.object.id);
+      if (current.status === 'succeeded') return { received: true };
+      if (current.status !== 'canceled' && !(['requires_payment_method', 'requires_confirmation', 'requires_action'].includes(current.status) && await services.testPayments.cancel(event.data.object.id))) {
+        throw new Error('Stripe test intent must be canceled before releasing sponsor funds');
+      }
+    }
     await failMockPayment(event.data.object.id, services);
     return { received: true };
   }

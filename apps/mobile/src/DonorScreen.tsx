@@ -19,7 +19,7 @@ function ImpactCelebration({ confirmation, receipt, onClose }: { confirmation: C
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   const confirmed = receipt !== null;
   const summary = confirmed
-    ? `Your ${dollars(confirmation.amountCents)} ${confirmation.mode === 'mock' ? 'demo' : 'test'} payment was recorded for ${confirmation.billerName}, account ••••${confirmation.accountLast4 ?? 'private'}. The creditor payment is simulated.`
+    ? `Your ${dollars(receipt.donorPrincipalCents)} ${confirmation.mode === 'mock' ? 'demo' : 'test'} gift${receipt.sponsorMatchCents > 0 ? ` plus ${dollars(receipt.sponsorMatchCents)} from ${receipt.sponsorName}` : ''} directed ${dollars(receipt.amountToBillCents)} to ${confirmation.billerName}, account ••••${confirmation.accountLast4 ?? 'private'}. The creditor payment is simulated.`
     : `Your ${dollars(confirmation.amountCents)} test payment was accepted. Creditor confirmation is pending.`;
   async function shareReceipt() {
     if (!receipt) return;
@@ -34,7 +34,10 @@ function ImpactCelebration({ confirmation, receipt, onClose }: { confirmation: C
     {receipt ? <>
       <View className="mt-6 rounded-2xl bg-white/10 p-5">
         <Text className="text-xs font-bold tracking-widest text-mint">PAYMENT CONFIRMATION</Text>
-        <View className="mt-4 flex-row justify-between"><Text className="text-sm text-white/80">Paid to creditor</Text><Text className="font-black text-white">{dollars(receipt.amountToBillCents)}</Text></View>
+        <Text className="mt-3 text-xs leading-5 text-white/80">Verified creditor: {confirmation.billerName} · acct ••••{receipt.accountLast4 ?? 'private'}</Text>
+        <View className="mt-4 flex-row justify-between"><Text className="text-sm text-white/80">Your contribution</Text><Text className="font-black text-white">{dollars(receipt.donorPrincipalCents)}</Text></View>
+        {receipt.sponsorMatchCents > 0 && <View className="mt-3 flex-row justify-between"><Text className="flex-1 text-sm text-white/80">{receipt.sponsorName} match</Text><Text className="font-black text-white">+{dollars(receipt.sponsorMatchCents)}</Text></View>}
+        <View className="mt-3 flex-row justify-between"><Text className="text-sm text-white/80">To verified creditor</Text><Text className="font-black text-white">{dollars(receipt.amountToBillCents)}</Text></View>
         <View className="mt-3 flex-row justify-between"><Text className="text-sm text-white/80">Test total</Text><Text className="font-black text-white">{dollars(receipt.totalChargeCents)}</Text></View>
         <Text className="mt-4 text-xs leading-5 text-white/70">{receipt.taxNotice}</Text>
         <Text className="mt-3 text-xs leading-5 text-white/70">{BRAND_NOTICE}</Text>
@@ -99,6 +102,6 @@ export function DonorScreen() {
         {loading ? <View className="mt-5 rounded-3xl bg-white p-10"><ActivityIndicator color="#176B5D" /></View> : current ? <SwipeableBillCard key={`${current.id}-${selectedBill ? 'open' : 'closed'}`} bill={current} onGive={() => setSelectedBill(current)} onPass={() => setIndex((value) => value + 1)} /> : <View className="mt-5 rounded-3xl border border-line bg-white p-7"><Text className="text-2xl font-black text-ink">{visibleBills.length === 0 ? `No ${categoryFilter === 'all' ? '' : `${categoryFilter} `}bills right now.` : 'You are all caught up.'}</Text><Text className="mt-2 text-sm leading-6 text-muted">Choose another category or check back for more verified demo bills.</Text><Pressable onPress={() => void refresh()} className="mt-6 rounded-2xl bg-pine p-4"><Text className="text-center font-bold text-white">Refresh feed</Text></Pressable></View>}</View>}
     {error && <Text className="mt-4 text-sm font-medium text-red-700">{error}</Text>}
   </ScrollView>
-    <CheckoutSheet bill={selectedBill} onClose={() => setSelectedBill(null)} onComplete={handleComplete} />
+    <CheckoutSheet bill={selectedBill} onClose={() => { setSelectedBill(null); void refresh(); }} onComplete={handleComplete} />
   </View>;
 }

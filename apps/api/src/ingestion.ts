@@ -41,7 +41,7 @@ export async function processUploadedBill(billId: string, services: Services, ex
     const now = new Date();
     const yearStart = new Date(Date.UTC(now.getUTCFullYear(), 0, 1));
     const nextYearStart = new Date(Date.UTC(now.getUTCFullYear() + 1, 0, 1));
-    const [aid] = await tx.select({ total: sum(transactions.amountToBillCents) }).from(transactions)
+    const [aid] = await tx.select({ total: sum(sql`${transactions.amountToBillCents} + ${transactions.sponsorMatchCents}`) }).from(transactions)
       .innerJoin(bills, eq(transactions.billId, bills.id))
       .where(and(eq(bills.recipientId, recipient.id), eq(transactions.status, 'succeeded'), gte(transactions.updatedAt, yearStart), lt(transactions.updatedAt, nextYearStart)));
     const [activeBills] = await tx.select({ total: sum(bills.remainingBalanceCents) }).from(bills)

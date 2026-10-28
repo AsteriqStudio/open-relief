@@ -3,6 +3,7 @@ import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextInput, View 
 import { adminPreviewSource, decideReview, getPendingReviews } from './api';
 import type { AdminReview } from './api';
 import { useAuth } from './AuthContext';
+import { COLORS, PrimaryButton } from './design';
 
 const dollars = (cents: number | null) => cents === null ? 'Unknown' : `$${(cents / 100).toFixed(2)}`;
 const rejectionOptions = ['Name Mismatch', 'Non-Urgent Bill', 'Unreadable Document'] as const;
@@ -23,22 +24,23 @@ function ReviewCard({ review, token, onDecided }: { review: AdminReview; token: 
     catch (failure) { setError(failure instanceof Error ? failure.message : 'Decision failed'); }
     finally { setBusy(false); }
   }
-  return <View className="mb-5 rounded-3xl border border-line bg-white p-5 shadow-sm">
-    <Text className="text-[11px] font-black tracking-widest text-amber">MANUAL REVIEW</Text>
-    <Text className="mt-2 text-xl font-black text-ink">{review.billerName ?? 'Unidentified creditor'}</Text>
-    <Text className="mt-2 text-sm text-muted">{review.recipientEmail} · {dollars(review.statementBalanceCents)}</Text>
-    <View className="mt-4 overflow-hidden rounded-2xl border-2 border-pine-dark bg-white"><Image source={adminPreviewSource(review.billId, token)} resizeMode="contain" style={{ width: '100%', height: 220 }} onLoad={() => { setPreviewLoaded(true); setPreviewFailed(false); }} onError={() => { setPreviewLoaded(false); setPreviewFailed(true); }} /></View>
-    <Text className="mt-2 text-xs text-slate-500">{review.documentMimeType === 'application/pdf' ? 'First page of PDF' : 'Uploaded bill image'} · Full document available through the admin document API.</Text>
-    {previewFailed && <Text className="mt-2 text-sm text-red-700">Preview unavailable. Approval is disabled until the document can be inspected.</Text>}
-    <View className="mt-4 rounded-2xl bg-slate-50 p-4"><Text className="text-xs font-bold uppercase text-slate-500">Name comparison</Text><Text className="mt-2 text-sm text-slate-800">Recipient: {review.recipientLegalName ?? 'Missing'}</Text><Text className="mt-1 text-sm text-slate-800">Bill account holder: {review.accountHolderName ?? 'Missing'}</Text><Text className={`mt-2 text-lg font-black ${review.nameMatchPercentage !== null && review.nameMatchPercentage < 80 ? 'text-red-700' : 'text-emerald-700'}`}>{review.nameMatchPercentage === null ? 'Match unavailable' : `${review.nameMatchPercentage}% match`}</Text></View>
-    <Text className="mt-4 text-sm text-slate-700">Flag: {review.rejectionReason ?? 'Manual document review'}</Text>
-    <Text className="mt-2 text-xs text-slate-500">OCR confidence: {review.ocrConfidence ?? 'Unknown'}% · Shut-off: {review.daysUntilDisconnection === null ? 'Date unknown' : `${review.daysUntilDisconnection} days`}</Text>
-    <Text className="mt-5 text-xs font-bold uppercase tracking-widest text-slate-500">Decision notes</Text>
-    <View className="mt-2 flex-row flex-wrap gap-2">{rejectionOptions.map((option) => <Pressable key={option} onPress={() => setNotes(option)} className="rounded-full bg-slate-100 px-3 py-2"><Text className="text-xs font-semibold text-slate-700">{option}</Text></Pressable>)}</View>
-    <TextInput className="mt-3 rounded-xl border border-slate-300 bg-white p-3" placeholder="Reason or verification evidence" value={notes} onChangeText={setNotes} multiline maxLength={1000} />
-    {error && <Text className="mt-3 text-sm text-red-700">{error}</Text>}
-    <Pressable disabled={busy || !previewLoaded} onPress={() => void decide('approve')} className={`mt-4 rounded-2xl p-4 ${busy || !previewLoaded ? 'bg-muted' : 'bg-pine'}`}><Text className="text-center font-bold text-white">✓ Approve & Add to Feed</Text></Pressable>
-    <Pressable disabled={busy} onPress={() => void decide('reject')} className="mt-3 rounded-2xl border border-red-700 p-4"><Text className="text-center font-bold text-red-800">✕ Reject with Reason</Text></Pressable>
+  const nameMatchLow = review.nameMatchPercentage !== null && review.nameMatchPercentage < 80;
+  return <View className="mb-5 rounded-[28px] border border-line bg-surface p-5">
+    <View className="flex-row items-center justify-between gap-2"><Text className="text-[11px] font-black tracking-widest text-amber">MANUAL REVIEW</Text><View className="rounded-full border border-[#543B14] bg-cream px-3 py-1"><Text className="text-[10px] font-bold text-amber">PENDING</Text></View></View>
+    <Text className="mt-4 text-xl font-black text-ink">{review.billerName ?? 'Unidentified creditor'}</Text>
+    <Text className="mt-1 text-sm text-muted">{review.recipientEmail} · {dollars(review.statementBalanceCents)}</Text>
+    <View className="mt-5 overflow-hidden rounded-2xl border border-line bg-inset"><Image source={adminPreviewSource(review.billId, token)} resizeMode="contain" style={{ width: '100%', height: 220 }} onLoad={() => { setPreviewLoaded(true); setPreviewFailed(false); }} onError={() => { setPreviewLoaded(false); setPreviewFailed(true); }} /></View>
+    <Text className="mt-2 text-xs leading-5 text-muted">{review.documentMimeType === 'application/pdf' ? 'First page of PDF' : 'Uploaded bill image'} · Full document available through the admin document API.</Text>
+    {previewFailed && <Text className="mt-2 text-sm text-coral">Preview unavailable. Approval is disabled until the document can be inspected.</Text>}
+    <View className="mt-4 rounded-2xl border border-[#162920] bg-inset p-4"><Text className="text-[11px] font-bold tracking-widest text-muted">NAME COMPARISON</Text><Text className="mt-3 text-sm text-ink">Recipient: {review.recipientLegalName ?? 'Missing'}</Text><Text className="mt-1 text-sm text-ink">Bill account holder: {review.accountHolderName ?? 'Missing'}</Text><View className={`mt-3 self-start rounded-full border px-3 py-1.5 ${nameMatchLow ? 'border-[#5C1D1D] bg-[#2B0E0E]' : 'border-[#24563F] bg-[#0D2A1D]'}`}><Text className={`text-xs font-bold ${nameMatchLow ? 'text-coral' : 'text-mint'}`}>{review.nameMatchPercentage === null ? 'Match unavailable' : `${review.nameMatchPercentage}% name match`}</Text></View></View>
+    <View className="mt-4 flex-row flex-wrap gap-2"><View className="rounded-full border border-[#543B14] bg-cream px-3 py-2"><Text className="text-xs font-bold text-amber">{review.daysUntilDisconnection === null ? 'Shut-off date unknown' : `Shut-off in ${review.daysUntilDisconnection} days`}</Text></View><View className="rounded-full border border-line bg-inset px-3 py-2"><Text className="text-xs font-bold text-muted">OCR {review.ocrConfidence === null ? 'unknown' : `${review.ocrConfidence}%`}</Text></View></View>
+    <Text className="mt-4 text-sm leading-5 text-muted">Flag: {review.rejectionReason ?? 'Manual document review'}</Text>
+    <Text className="mt-5 text-xs font-bold uppercase tracking-widest text-muted">Decision notes</Text>
+    <View className="mt-2 flex-row flex-wrap gap-2">{rejectionOptions.map((option) => <Pressable key={option} accessibilityRole="button" onPress={() => setNotes(option)} className={`rounded-full border px-3 py-2 ${notes === option ? 'border-pine bg-[#0D2A1D]' : 'border-line bg-inset'}`}><Text className={`text-xs font-semibold ${notes === option ? 'text-mint' : 'text-muted'}`}>{option}</Text></Pressable>)}</View>
+    <TextInput className="mt-3 min-h-20 rounded-xl border border-line bg-inset p-3 text-ink" placeholder="Reason or verification evidence" placeholderTextColor="#66766E" selectionColor={COLORS.emerald} value={notes} onChangeText={setNotes} multiline maxLength={1000} />
+    {error && <Text className="mt-3 text-sm text-coral">{error}</Text>}
+    <View className="mt-5"><PrimaryButton disabled={busy || !previewLoaded} onPress={() => void decide('approve')} label="✓  Approve & add to feed" outline /></View>
+    <Pressable accessibilityRole="button" disabled={busy} onPress={() => void decide('reject')} className="mt-3 min-h-14 items-center justify-center rounded-full border border-[#5C1D1D] bg-[#2B0E0E] px-4"><Text className="text-center text-sm font-bold text-coral">✕  Reject with reason</Text></Pressable>
   </View>;
 }
 
@@ -57,10 +59,10 @@ export function AdminReviewScreen() {
     finally { setLoading(false); }
   }
   useEffect(() => { void refresh(1); }, [token]);
-  return <ScrollView className="flex-1 bg-canvas px-5 pt-5" contentContainerStyle={{ paddingBottom: 36 }}>
-    <Text className="text-[11px] font-black tracking-widest text-pine">ADMIN TRIAGE</Text><Text className="mt-2 text-3xl font-black text-ink">Review with care.</Text><Text className="mt-2 text-sm leading-5 text-muted">{total} bills need a documented decision.</Text>
-    {error && <Text className="mt-4 text-red-700">{error}</Text>}
-    {loading ? <ActivityIndicator className="mt-8" /> : <View className="mt-6">{reviews.length ? reviews.map((review) => <ReviewCard key={review.billId} review={review} token={token!} onDecided={() => void refresh()} />) : <Text className="rounded-2xl bg-white p-6 text-slate-600">No pending reviews on this page.</Text>}</View>}
-    <View className="mt-2 flex-row items-center justify-between"><Pressable disabled={page <= 1} onPress={() => void refresh(page - 1)}><Text className={page <= 1 ? 'text-slate-400' : 'font-bold text-emerald-700'}>Previous</Text></Pressable><Text className="text-slate-600">Page {page}</Text><Pressable disabled={page * 20 >= total} onPress={() => void refresh(page + 1)}><Text className={page * 20 >= total ? 'text-slate-400' : 'font-bold text-emerald-700'}>Next</Text></Pressable></View>
+  return <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 42 }}>
+    <Text className="text-[11px] font-black tracking-widest text-pine">ADMIN TRIAGE</Text><Text className="mt-3 text-4xl font-black tracking-tight text-ink">Review with care.</Text><Text className="mt-2 text-sm leading-6 text-muted">{total} bills need a documented decision. Approval requires viewing the bill.</Text>
+    {error && <Text className="mt-4 text-coral">{error}</Text>}
+    {loading ? <ActivityIndicator className="mt-8" color={COLORS.emerald} /> : <View className="mt-6">{reviews.length ? reviews.map((review) => <ReviewCard key={review.billId} review={review} token={token!} onDecided={() => void refresh()} />) : <View className="rounded-[28px] border border-line bg-surface p-6"><Text className="text-lg font-bold text-ink">Queue is clear</Text><Text className="mt-2 text-sm text-muted">No pending reviews on this page.</Text></View>}</View>}
+    <View className="mt-5 flex-row items-center justify-between"><Pressable accessibilityRole="button" disabled={page <= 1} onPress={() => void refresh(page - 1)}><Text className={page <= 1 ? 'text-muted' : 'font-bold text-mint'}>Previous</Text></Pressable><Text className="text-muted">Page {page}</Text><Pressable accessibilityRole="button" disabled={page * 20 >= total} onPress={() => void refresh(page + 1)}><Text className={page * 20 >= total ? 'text-muted' : 'font-bold text-mint'}>Next</Text></Pressable></View>
   </ScrollView>;
 }

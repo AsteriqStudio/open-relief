@@ -8,8 +8,12 @@ import { useAuth } from './AuthContext';
 import { recipientAttestation } from '@open-relief/shared';
 import { LegalModal } from './LegalModal';
 import type { LegalDocument } from './LegalModal';
+import { COLORS, PrimaryButton } from './design';
 
 type SelectedFile = { uri: string; name: string; mimeType: 'image/jpeg' | 'image/png' | 'application/pdf' };
+type IntakeStep = 'start' | 'uploaded' | 'scanning' | 'verified' | 'paid';
+const intakeSteps = ['Uploaded', 'OCR scan', 'Verified', 'Paid'] as const;
+const stepIndex: Record<IntakeStep, number> = { start: -1, uploaded: 0, scanning: 1, verified: 2, paid: 3 };
 
 export function RecipientScreen() {
   const { token } = useAuth();
@@ -21,6 +25,7 @@ export function RecipientScreen() {
   const [legalDocument, setLegalDocument] = useState<LegalDocument | null>(null);
   const [file, setFile] = useState<SelectedFile | null>(null);
   const [status, setStatus] = useState('Choose a bill document');
+  const [step, setStep] = useState<IntakeStep>('start');
   const [busy, setBusy] = useState(false);
 
   async function chooseCamera() {
@@ -47,16 +52,18 @@ export function RecipientScreen() {
     if (!file || !token || busy || !attestationAccepted || !declaredBillerName.trim()) return;
     setBusy(true);
     try {
-      setStatus('Uploaded');
+      setStatus('Uploading document');
       const billId = await uploadBill({ ...file, category, zipCode, story, declaredBillerName: declaredBillerName.trim(), attestationAccepted: true }, token);
+      setStep('uploaded');
       setStatus('Scanning');
+      setStep('scanning');
       for (let attempt = 0; attempt < 30; attempt += 1) {
         await new Promise((resolve) => setTimeout(resolve, 1000));
         const details = await getBillDetails(billId, token);
         const current = details.status;
-        if (current === 'verified') { setStatus('Verified'); return; }
-        if (current === 'funded') { setStatus('Funded'); return; }
-        if (current === 'settled') { setStatus('Paid'); return; }
+        if (current === 'verified') { setStep('verified'); setStatus('Verified'); return; }
+        if (current === 'funded') { setStep('verified'); setStatus('Funded'); return; }
+        if (current === 'settled') { setStep('paid'); setStatus('Paid'); return; }
         if (current === 'pending_review') { setStatus(details.rejectionReason ?? 'Manual review required'); return; }
         if (current === 'rejected') { setStatus(details.rejectionReason ?? 'Rejected; please contact support'); return; }
       }
@@ -68,26 +75,37 @@ export function RecipientScreen() {
     }
   }
 
-  return <ScrollView className="flex-1 bg-canvas" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 }}>
-    <Text className="text-[11px] font-black tracking-widest text-pine">GET SUPPORT</Text>
-    <Text className="mt-2 text-3xl font-black text-ink">One bill. A path forward.</Text>
-    <Text className="mt-2 text-sm leading-6 text-muted">Send an overdue bill for demo verification. Donors pay the creditor directly; you never receive cash.</Text>
-    <View className="mt-5 flex-row items-center rounded-2xl bg-mint p-4"><Text className="mr-3 text-xl font-black text-pine">✓</Text><Text className="flex-1 text-xs font-semibold leading-5 text-pine-dark">Your bill stays off the donor feed until it passes review.</Text></View>
-    <View className="mt-5 rounded-3xl border border-line bg-white p-5">
+  return <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 42 }}>
+    <Text className="text-[11px] font-bold tracking-[2px] text-pine">NEED RELIEF</Text>
+    <Text className="mt-3 text-4xl font-black tracking-tight text-ink">One bill.{'\n'}A path forward.</Text>
+    <Text className="mt-3 text-sm leading-6 text-muted">Submit an overdue bill for demo review. Donors pay the creditor account directly; you never receive cash.</Text>
+    <View className="mt-6 flex-row items-center rounded-2xl border border-[#24563F] bg-[#0D2A1D] p-4"><Text className="mr-3 text-xl font-black text-mint">✓</Text><Text className="flex-1 text-xs font-semibold leading-5 text-mint">Your bill stays off the donor feed until review is complete.</Text></View>
+    <View className="mt-5 rounded-[24px] border border-line bg-surface p-5">
       <Text className="text-[11px] font-black tracking-widest text-pine">01  BILL DETAILS</Text>
       <Text className="mt-5 text-sm font-bold text-ink">Bill category</Text>
-      <View className="mt-3 flex-row flex-wrap gap-2">{(['electric', 'water', 'gas', 'medical', 'telecom'] as const).map((item) => <Pressable key={item} onPress={() => setCategory(item)} className={`rounded-full px-4 py-2.5 ${category === item ? 'bg-pine-dark' : 'bg-canvas'}`}><Text className={`font-bold capitalize ${category === item ? 'text-white' : 'text-ink'}`}>{item}</Text></Pressable>)}</View>
+      <View className="mt-3 flex-row flex-wrap gap-2">{(['electric', 'water', 'gas', 'medical', 'telecom'] as const).map((item) => <Pressable key={item} accessibilityRole="button" accessibilityState={{ selected: category === item }} onPress={() => setCategory(item)} className={`rounded-full border px-4 py-2.5 ${category === item ? 'border-pine bg-[#0D2A1D]' : 'border-line bg-inset'}`}><Text className={`text-sm font-bold capitalize ${category === item ? 'text-mint' : 'text-muted'}`}>{item}</Text></Pressable>)}</View>
       <Text className="mt-5 text-sm font-bold text-ink">ZIP code</Text>
-      <TextInput className="mt-2 rounded-xl border border-line bg-canvas p-4 text-ink" keyboardType="number-pad" maxLength={5} value={zipCode} onChangeText={setZipCode} />
+      <TextInput className="mt-2 min-h-12 rounded-xl border border-line bg-inset p-4 text-ink" selectionColor={COLORS.emerald} keyboardType="number-pad" maxLength={5} value={zipCode} onChangeText={setZipCode} />
       <Text className="mt-5 text-sm font-bold text-ink">Creditor shown on the bill</Text>
-      <TextInput className="mt-2 rounded-xl border border-line bg-canvas p-4 text-ink" placeholder="Creditor name on your bill" value={declaredBillerName} onChangeText={(value) => { setDeclaredBillerName(value); setAttestationAccepted(false); }} />
+      <TextInput className="mt-2 min-h-12 rounded-xl border border-line bg-inset p-4 text-ink" placeholder="Creditor name on your bill" placeholderTextColor="#66766E" selectionColor={COLORS.emerald} value={declaredBillerName} onChangeText={(value) => { setDeclaredBillerName(value); setAttestationAccepted(false); }} />
       <Text className="mt-5 text-sm font-bold text-ink">Short anonymous story</Text>
-      <TextInput className="mt-2 min-h-20 rounded-xl border border-line bg-canvas p-4 text-ink" multiline maxLength={240} value={story} onChangeText={setStory} />
+      <TextInput className="mt-2 min-h-20 rounded-xl border border-line bg-inset p-4 text-ink" selectionColor={COLORS.emerald} multiline maxLength={240} value={story} onChangeText={setStory} />
+      <View className="mt-5 rounded-xl border border-line bg-inset p-3"><Text className="text-xs font-bold text-mint">⌑  Creditor account details are stored encrypted</Text><Text className="mt-1 text-[11px] leading-4 text-muted">Account information is extracted from the bill during review, then masked in the donor feed.</Text></View>
     </View>
-    <View className="mt-4 rounded-3xl border border-line bg-white p-5"><Text className="text-[11px] font-black tracking-widest text-pine">02  BILL DOCUMENT</Text><Text className="mt-2 text-sm leading-5 text-muted">Choose a clear photo or PDF showing the creditor and overdue amount.</Text><View className="mt-5 flex-row gap-3"><Pressable onPress={() => void chooseCamera()} className="min-h-12 flex-1 items-center justify-center rounded-xl bg-pine-dark"><Text className="font-bold text-white">Take photo</Text></Pressable><Pressable onPress={() => void chooseFile()} className="min-h-12 flex-1 items-center justify-center rounded-xl border border-pine"><Text className="font-bold text-pine">Choose file</Text></Pressable></View><Text className="mt-3 text-xs leading-5 text-muted">{file?.name ?? 'JPEG, PNG, or PDF · up to 10 MB'}</Text></View>
-    <View className="mt-4 rounded-3xl border border-line bg-white p-5"><Text className="text-[11px] font-black tracking-widest text-pine">03  CONFIRM & SUBMIT</Text><Pressable accessibilityRole="checkbox" accessibilityState={{ checked: attestationAccepted }} onPress={() => setAttestationAccepted((value) => !value)} className="mt-4 flex-row"><View className={`mr-3 h-7 w-7 items-center justify-center rounded-lg ${attestationAccepted ? 'bg-pine' : 'border border-line bg-canvas'}`}><Text className="font-black text-white">{attestationAccepted ? '✓' : ''}</Text></View><Text className="flex-1 text-sm leading-6 text-muted">{recipientAttestation(declaredBillerName.trim() || 'the creditor shown on my bill')}</Text></Pressable><View className="mt-4 flex-row gap-5"><Pressable onPress={() => setLegalDocument('terms')}><Text className="font-bold text-pine">Terms of service</Text></Pressable><Pressable onPress={() => setLegalDocument('privacy')}><Text className="font-bold text-pine">Privacy notice</Text></Pressable></View></View>
-    <Pressable disabled={!file || busy || !attestationAccepted || !declaredBillerName.trim()} onPress={() => void submit()} className={`mt-5 min-h-14 items-center justify-center rounded-2xl ${!file || busy || !attestationAccepted || !declaredBillerName.trim() ? 'bg-muted' : 'bg-pine'}`}><Text className="text-base font-black text-white">Submit bill for review  →</Text></Pressable>
-    <View className="mt-5 rounded-3xl bg-pine-dark p-5"><Text className="text-[11px] font-bold tracking-widest text-mint">STATUS TRACKER</Text><Text className="mt-3 text-xs leading-5 text-white/70">Uploaded → Scanning → Verified → Funded → Paid</Text><Text className="mt-3 font-black text-white">{status}</Text>{busy && <ActivityIndicator className="mt-3" color="#DFF2E8" />}</View>
+    <View className="mt-4 rounded-[24px] border border-line bg-surface p-5"><Text className="text-[11px] font-bold tracking-widest text-pine">02  BILL DOCUMENT</Text><Text className="mt-2 text-sm leading-5 text-muted">Choose a clear photo or PDF showing the creditor and overdue amount.</Text>
+      <View className="mt-5 rounded-2xl border-2 border-dashed border-[#24563F] bg-inset p-5"><Text className="text-center text-2xl text-mint">⌑</Text><Text className="mt-2 text-center text-sm font-semibold text-ink">{file?.name ?? 'Upload an overdue bill'}</Text><Text className="mt-1 text-center text-xs text-muted">JPEG, PNG, or PDF · up to 10 MB</Text>
+        <View className="mt-5 flex-row gap-3"><Pressable accessibilityRole="button" onPress={() => void chooseCamera()} className="min-h-12 flex-1 items-center justify-center rounded-full bg-pine"><Text className="text-sm font-bold text-canvas">Take photo</Text></Pressable><Pressable accessibilityRole="button" onPress={() => void chooseFile()} className="min-h-12 flex-1 items-center justify-center rounded-full border border-pine"><Text className="text-sm font-bold text-mint">Choose file</Text></Pressable></View>
+      </View>
+    </View>
+    <View className="mt-4 rounded-[24px] border border-line bg-surface p-5"><Text className="text-[11px] font-bold tracking-widest text-pine">03  CONFIRM & SUBMIT</Text>
+      <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: attestationAccepted }} onPress={() => setAttestationAccepted((value) => !value)} className="mt-4 flex-row rounded-2xl border border-line bg-inset p-4"><View className={`mr-3 h-7 w-7 items-center justify-center rounded-lg ${attestationAccepted ? 'bg-pine' : 'border border-line bg-inset'}`}><Text className="font-black text-canvas">{attestationAccepted ? '✓' : ''}</Text></View><Text className="flex-1 text-xs leading-5 text-muted">{recipientAttestation(declaredBillerName.trim() || 'the creditor shown on my bill')}</Text></Pressable>
+      <View className="mt-4 flex-row gap-5"><Pressable accessibilityRole="button" onPress={() => setLegalDocument('terms')}><Text className="text-sm font-bold text-mint">Terms of service</Text></Pressable><Pressable accessibilityRole="button" onPress={() => setLegalDocument('privacy')}><Text className="text-sm font-bold text-mint">Privacy notice</Text></Pressable></View>
+    </View>
+    <View className="mt-5"><PrimaryButton disabled={!file || busy || !attestationAccepted || !declaredBillerName.trim()} onPress={() => void submit()} label={busy ? 'Submitting…' : 'Submit bill for review  →'} /></View>
+    <View className="mt-6 rounded-[24px] border border-line bg-surface p-5"><Text className="text-[11px] font-bold tracking-widest text-pine">STATUS TRACKER</Text>
+      <View className="mt-5 flex-row items-start">{intakeSteps.map((label, index) => <View key={label} className="flex-1 items-center"><View className="flex-row items-center self-stretch"><View className="flex-1" /><View className={`h-8 w-8 items-center justify-center rounded-full border ${stepIndex[step] >= index ? 'border-pine bg-pine' : 'border-line bg-inset'}`}><Text className={`text-xs font-black ${stepIndex[step] >= index ? 'text-canvas' : 'text-muted'}`}>{stepIndex[step] >= index ? '✓' : index + 1}</Text></View><View className={`h-px flex-1 ${index < intakeSteps.length - 1 && stepIndex[step] > index ? 'bg-pine' : 'bg-line'}`} /></View><Text className={`mt-2 text-center text-[10px] font-semibold ${stepIndex[step] === index ? 'text-mint' : 'text-muted'}`}>{label}</Text></View>)}</View>
+      <Text className="mt-5 text-sm font-bold text-ink">{status}</Text>{busy && <ActivityIndicator className="mt-3" color={COLORS.emerald} />}
+    </View>
     <LegalModal document={legalDocument} onClose={() => setLegalDocument(null)} />
   </ScrollView>;
 }

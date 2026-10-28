@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { bills, sponsorshipAllocations, sponsorshipPools, transactions } from '@open-relief/db';
@@ -23,6 +23,20 @@ const DonationIntentRequestSchema = z.object({
 const TransactionIdSchema = z.object({ id: z.string().uuid() });
 
 export function registerDonationRoutes(app: FastifyInstance, services: Services, requireAuth: ReturnType<typeof registerAuth>) {
+  app.get('/api/donations/impact', { preHandler: requireAuth({ roles: ['donor'] }) }, async (request) => {
+    const rows = await services.db.select({
+      billId: transactions.billId,
+      amountToBillCents: transactions.amountToBillCents,
+      sponsorMatchCents: transactions.sponsorMatchCents,
+      billStatus: bills.status,
+    }).from(transactions).innerJoin(bills, eq(transactions.billId, bills.id))
+      .where(and(eq(transactions.donorId, request.user!.id), eq(transactions.status, 'succeeded')));
+    return {
+      creditorAidCents: rows.reduce((total, row) => total + row.amountToBillCents + row.sponsorMatchCents, 0),
+      settledBills: new Set(rows.filter((row) => row.billStatus === 'settled').map((row) => row.billId)).size,
+      sponsorMatches: rows.filter((row) => row.sponsorMatchCents > 0).length,
+    };
+  });
   app.post('/api/donations/create-intent', { preHandler: requireAuth({ roles: ['donor'] }) }, async (request, reply) => {
     const input = DonationIntentRequestSchema.parse(request.body);
     const provider = createStripePaymentsClient(services.config);
@@ -66,6 +80,7 @@ export function registerDonationRoutes(app: FastifyInstance, services: Services,
       receiptEmailPayload: transactions.receiptEmailPayload,
       stripePaymentIntentId: transactions.stripePaymentIntentId,
       billerName: bills.billerName,
+      remainingBalanceCents: bills.remainingBalanceCents,
       billerAccountEncrypted: bills.billerAccountEncrypted,
       createdAt: transactions.createdAt,
     }).from(transactions).innerJoin(bills, eq(transactions.billId, bills.id)).where(eq(transactions.id, id));

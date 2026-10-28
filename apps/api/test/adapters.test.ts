@@ -7,6 +7,7 @@ import { auditLogs, bills, transactions, users } from '@open-relief/db';
 import { encryptAccountNumber } from '@open-relief/db/security/encryption';
 import { calculateDonationSplit } from '@open-relief/shared';
 import { buildApp } from '../dist/app.js';
+import { hashPassword } from '../dist/auth.js';
 import { MethodSandboxBillerClient, METHOD_SANDBOX_BASE_URL, isVerifiedDemoMerchantForCategory } from '../dist/biller/methodSandbox.js';
 import { ApiConfigSchema } from '../dist/config.js';
 import { createDonationIntent } from '../dist/payments.js';
@@ -103,7 +104,7 @@ test('signed Stripe test events settle partial and full bills once through Metho
     await app.ready();
     await services.db.insert(users).values([
       { id: recipientId, role: 'recipient', email: `${recipientId}@example.invalid`, phone: '+15555550111' },
-      { id: donorId, role: 'donor', email: `${donorId}@example.invalid`, phone: '+15555550112' },
+      { id: donorId, role: 'donor', email: `${donorId}@example.invalid`, phone: '+15555550112', passwordHash: await hashPassword('local impact test password 2026') },
     ]);
     await services.db.insert(bills).values({
       id: billId, recipientId, billerName: 'DTE Energy demo', billerMerchantId: 'mock-electric-detroit',
@@ -111,6 +112,12 @@ test('signed Stripe test events settle partial and full bills once through Metho
       documentUrl: 'https://example.invalid/test.pdf', documentKey: `test/${billId}.pdf`, documentMimeType: 'application/pdf', documentSizeBytes: 1,
       statementBalanceCents: 12_500, remainingBalanceCents: 12_500, status: 'verified',
     });
+    const signIn = await app.inject({ method: 'POST', url: '/api/auth/signin', payload: { email: `${donorId}@example.invalid`, password: 'local impact test password 2026' } });
+    assert.equal(signIn.statusCode, 200, signIn.body);
+    const donorHeaders = { authorization: `Bearer ${signIn.json<{ token: string }>().token}` };
+    assert.equal((await app.inject({ method: 'GET', url: '/api/donations/impact' })).statusCode, 401);
+    const beforeImpact = await app.inject({ method: 'GET', url: '/api/donations/impact', headers: donorHeaders });
+    assert.deepEqual(beforeImpact.json(), { creditorAidCents: 0, settledBills: 0, sponsorMatches: 0 });
     const sendSucceeded = async (intent: Awaited<ReturnType<typeof createDonationIntent>>, metadata: Record<string, string>) => {
       const payload = JSON.stringify({
         id: `evt_test_${randomUUID()}`, type: 'payment_intent.succeeded', data: { object: {
@@ -152,6 +159,9 @@ test('signed Stripe test events settle partial and full bills once through Metho
     const [recipient] = await services.db.select().from(users).where(eq(users.id, recipientId));
     assert.equal(recipient?.lifetimeAidCents, 12_500);
     assert.ok(recipient.lastAidAt);
+    const impact = await app.inject({ method: 'GET', url: '/api/donations/impact', headers: donorHeaders });
+    assert.equal(impact.statusCode, 200, impact.body);
+    assert.deepEqual(impact.json(), { creditorAidCents: 12_500, settledBills: 1, sponsorMatches: 0 });
   } finally {
     await app.close();
     await services.close();

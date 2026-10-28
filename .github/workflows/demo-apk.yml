@@ -73,13 +73,14 @@ jobs:
       - name: Publish labeled prerelease
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: phase11-demo-rc1
-          name: Phase 11 offline pitch demo RC1
+          tag_name: phase11-demo-rc2
+          name: Open Relief offline demo RC2 · obsidian/emerald redesign
           prerelease: true
           make_latest: false
           body: |
             Fictional offline pitch simulation. No charges, disbursements, verified creditor payments, or charitable tax receipts occur in this APK.
             Built with an embedded JavaScript bundle and demo signing key for Android sideloading. It is not approved for public financial use.
+            If RC1 is already installed, uninstall it before installing RC2 because the temporary demo signing certificate may differ between CI builds.
           files: |
             builds/open-relief-demo.apk
             builds/open-relief-demo.apk.sha256

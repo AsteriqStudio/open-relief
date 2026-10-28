@@ -72,6 +72,12 @@ export async function getFeed(category?: FeedBill['category']): Promise<FeedBill
   return z.object({ bills: z.array(BillSchema) }).parse(await request(`/api/bills/feed${category ? `?category=${category}` : ''}`)).bills;
 }
 
+const DonorImpactSchema = z.object({ creditorAidCents: z.number().int().nonnegative(), settledBills: z.number().int().nonnegative(), sponsorMatches: z.number().int().nonnegative() });
+export type DonorImpact = z.infer<typeof DonorImpactSchema>;
+export async function getDonorImpact(token: string): Promise<DonorImpact> {
+  return DonorImpactSchema.parse(await request('/api/donations/impact', undefined, token));
+}
+
 export async function uploadBill(input: {
   category: FeedBill['category'];
   zipCode: string;
@@ -133,6 +139,7 @@ export async function completeMockDonation(transactionId: string, token: string)
 const DonationReceiptSchema = z.object({
   id: z.string().uuid(),
   billerName: z.string().nullable(),
+  remainingBalanceCents: z.number().int().nonnegative().nullable(),
   accountLast4: z.string().nullable(),
   amountToBillCents: z.number().int(),
   donorPrincipalCents: z.number().int(),

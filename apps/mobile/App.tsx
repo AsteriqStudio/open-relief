@@ -14,33 +14,31 @@ import { StripeProvider } from './src/stripeAdapter';
 import { AdminReviewScreen } from './src/AdminReviewScreen';
 import { ProfileScreen } from './src/ProfileScreen';
 import { OfflineDemoScreen } from './src/OfflineDemoScreen';
+import { BrandHeader, COLORS, ScreenBackdrop } from './src/design';
 
 const stripePublishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY;
 
 function SignedInApp() {
   const auth = useAuth();
   const [tab, setTab] = useState<'main' | 'profile'>('main');
-  if (auth.loading) return <ActivityIndicator style={{ flex: 1 }} />;
+  if (auth.loading) return <View className="flex-1 items-center justify-center bg-canvas"><ActivityIndicator color={COLORS.emerald} /></View>;
   if (!auth.user) return <AuthScreen />;
   const mainLabel = auth.user.role === 'recipient' ? 'Need Help' : auth.user.role === 'donor' ? 'Give Help' : 'Admin Review';
   return <GestureHandlerRootView style={{ flex: 1 }}>
-    <SafeAreaProvider><BottomSheetModalProvider><SafeAreaView className="flex-1 bg-canvas">
-      <StatusBar style="dark" />
-      <View className="flex-row items-center justify-between border-b border-line bg-canvas px-5 py-3">
-        <View className="flex-row items-center"><View className="h-9 w-9 items-center justify-center rounded-xl bg-pine-dark"><Text className="text-sm font-black text-white">or.</Text></View><View className="ml-3"><Text className="text-xs font-black tracking-widest text-ink">OPEN RELIEF</Text><Text className="text-[10px] font-medium tracking-wide text-muted">DIRECT-TO-CREDITOR AID</Text></View></View>
-        <View className="rounded-full border border-line bg-white px-3 py-1.5"><Text className="text-xs font-bold capitalize text-pine">{auth.user.role} · demo</Text></View>
-      </View>
+    <SafeAreaProvider><BottomSheetModalProvider><ScreenBackdrop><SafeAreaView className="flex-1">
+      <StatusBar style="light" backgroundColor={COLORS.backdrop} />
+      <View className="border-b border-line px-5 py-3"><BrandHeader mode="sandbox" subtitle={`${auth.user.role} account · direct creditor aid`} /></View>
       {tab === 'profile' ? <ProfileScreen /> : auth.user.role === 'recipient' ? <RecipientScreen /> : auth.user.role === 'donor' ? <DonorScreen /> : <AdminReviewScreen />}
-      <View className="flex-row border-t border-line bg-white px-3 pb-1 pt-2">
-        <Pressable accessibilityRole="tab" accessibilityState={{ selected: tab === 'main' }} onPress={() => setTab('main')} className={`flex-1 items-center rounded-2xl p-3 ${tab === 'main' ? 'bg-mint' : 'bg-white'}`}><Text className={`text-sm font-bold ${tab === 'main' ? 'text-pine-dark' : 'text-muted'}`}>{mainLabel}</Text></Pressable>
-        <Pressable accessibilityRole="tab" accessibilityState={{ selected: tab === 'profile' }} onPress={() => setTab('profile')} className={`flex-1 items-center rounded-2xl p-3 ${tab === 'profile' ? 'bg-mint' : 'bg-white'}`}><Text className={`text-sm font-bold ${tab === 'profile' ? 'text-pine-dark' : 'text-muted'}`}>Profile</Text></Pressable>
+      <View className="flex-row border-t border-line bg-surface px-3 pb-1 pt-2">
+        <Pressable accessibilityRole="tab" accessibilityState={{ selected: tab === 'main' }} onPress={() => setTab('main')} className={`flex-1 items-center rounded-full p-3 ${tab === 'main' ? 'bg-pine' : 'bg-surface'}`}><Text className={`text-sm font-bold ${tab === 'main' ? 'text-canvas' : 'text-muted'}`}>{mainLabel}</Text></Pressable>
+        <Pressable accessibilityRole="tab" accessibilityState={{ selected: tab === 'profile' }} onPress={() => setTab('profile')} className={`flex-1 items-center rounded-full p-3 ${tab === 'profile' ? 'bg-pine' : 'bg-surface'}`}><Text className={`text-sm font-bold ${tab === 'profile' ? 'text-canvas' : 'text-muted'}`}>Profile</Text></Pressable>
       </View>
-    </SafeAreaView></BottomSheetModalProvider></SafeAreaProvider>
+    </SafeAreaView></ScreenBackdrop></BottomSheetModalProvider></SafeAreaProvider>
   </GestureHandlerRootView>;
 }
 
 export default function App() {
-  if (process.env.EXPO_PUBLIC_OFFLINE_DEMO === '1') return <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider><BottomSheetModalProvider><SafeAreaView className="flex-1 bg-canvas"><StatusBar style="dark" /><OfflineDemoScreen /></SafeAreaView></BottomSheetModalProvider></SafeAreaProvider></GestureHandlerRootView>;
+  if (process.env.EXPO_PUBLIC_OFFLINE_DEMO === '1') return <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider><BottomSheetModalProvider><ScreenBackdrop><SafeAreaView className="flex-1"><StatusBar style="light" backgroundColor={COLORS.backdrop} /><OfflineDemoScreen /></SafeAreaView></ScreenBackdrop></BottomSheetModalProvider></SafeAreaProvider></GestureHandlerRootView>;
   const content = <AuthProvider><SignedInApp /></AuthProvider>;
   return stripePublishableKey?.startsWith('pk_test_')
     ? <StripeProvider publishableKey={stripePublishableKey}>{content}</StripeProvider>

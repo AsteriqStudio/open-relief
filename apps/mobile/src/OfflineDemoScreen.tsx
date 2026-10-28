@@ -1,10 +1,11 @@
 import { useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { calculateSponsoredDonationSplit, calculateSponsorMatchCents, formatCurrency, PITCH_CARDS } from '@open-relief/shared';
 import type { PitchCard } from '@open-relief/shared';
 import type { FeedBill } from './api';
 import { SwipeableBillCard } from './SwipeableBillCard';
+import { BrandHeader, COLORS, PrimaryButton, ReceiptRow } from './design';
 
 type DemoReceipt = { card: PitchCard; donorCents: number; matchCents: number; chargeCents: number; toCreditorCents: number; remainingCents: number };
 const startingBalances = Object.fromEntries(PITCH_CARDS.map((card) => [card.id, card.balanceCents]));
@@ -25,16 +26,19 @@ export function OfflineDemoScreen() {
   const [index, setIndex] = useState(0);
   const [selected, setSelected] = useState<PitchCard | null>(null);
   const [percentage, setPercentage] = useState<25 | 50 | 100>(50);
+  const [customAmount, setCustomAmount] = useState('');
   const [tipPercentage, setTipPercentage] = useState<0 | 10 | 15 | 20>(0);
   const [coverProcessingFee, setCoverProcessingFee] = useState(true);
   const [accepted, setAccepted] = useState(false);
   const [receipt, setReceipt] = useState<DemoReceipt | null>(null);
   const card = PITCH_CARDS[index % PITCH_CARDS.length]!;
   const remaining = selected ? balances[selected.id] ?? selected.balanceCents : 0;
-  const donorCents = selected && remaining > 0 ? Math.max(1, Math.round(remaining * percentage / 100)) : 0;
-  const matchCents = selected && selected.matchRatio > 0 && donorCents > 0
+  const customValid = /^\d{1,6}(?:[.,]\d{1,2})?$/.test(customAmount);
+  const customCents = customValid ? Math.round(Number(customAmount.replace(',', '.')) * 100) : 0;
+  const donorCents = selected && remaining > 0 ? customAmount ? customCents : Math.max(1, Math.round(remaining * percentage / 100)) : 0;
+  const matchCents = selected && selected.matchRatio > 0 && donorCents > 0 && donorCents <= remaining
     ? calculateSponsorMatchCents(donorCents, selected.matchRatio, remaining - donorCents) : 0;
-  const split = useMemo(() => selected && donorCents > 0
+  const split = useMemo(() => selected && donorCents > 0 && donorCents <= remaining
     ? calculateSponsoredDonationSplit({ billAmountCents: donorCents, sponsorMatchCents: matchCents, coverProcessingFee, tipPercentage, feeBufferAvailableCents: selected.sponsorName ? 1_000 : 0 })
     : null, [selected, donorCents, matchCents, coverProcessingFee, tipPercentage]);
 
@@ -42,6 +46,7 @@ export function OfflineDemoScreen() {
     if ((balances[next.id] ?? 0) <= 0) { setIndex((value) => value + 1); return; }
     setSelected(next);
     setPercentage(next.sponsorName ? 50 : 100);
+    setCustomAmount('');
     setTipPercentage(0);
     setCoverProcessingFee(true);
     setAccepted(false);
@@ -57,41 +62,60 @@ export function OfflineDemoScreen() {
     setSelected(null);
   }
 
-  return <View className="flex-1 bg-canvas">
-    <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 45 }}>
-      <View className="flex-row items-center justify-between"><View className="h-11 w-11 items-center justify-center rounded-2xl bg-pine-dark"><Text className="font-black text-white">or.</Text></View><View className="rounded-full bg-mint px-4 py-2"><Text className="text-xs font-black text-pine-dark">OFFLINE PITCH DEMO</Text></View></View>
-      <Text className="mt-5 text-4xl font-black leading-tight text-ink">Relief, directly{"\n"}to a creditor.</Text>
-      <Text className="mt-2 text-sm leading-6 text-muted">Four fictional bills. Simulated payments only. No card, bank, or network connection is used.</Text>
-      {receipt ? <View className="mt-6 rounded-3xl bg-pine-dark p-6">
-        <Text className="text-4xl font-black text-mint">✓</Text><Text className="mt-3 text-xs font-black tracking-widest text-mint">SIMULATED CONFIRMATION</Text>
-        <Text className="mt-2 text-3xl font-black text-white">Bill relieved.</Text>
-        <Text className="mt-3 text-sm leading-6 text-white/80">{formatCurrency(receipt.donorCents, receipt.card.currency)} demo gift{receipt.matchCents > 0 ? ` + ${formatCurrency(receipt.matchCents, receipt.card.currency)} fictional match` : ''} toward {receipt.card.billerName}.</Text>
-        <View className="mt-5 rounded-2xl bg-white/10 p-4"><Text className="text-sm text-white">Illustrative creditor amount: {formatCurrency(receipt.toCreditorCents, receipt.card.currency)}</Text><Text className="mt-2 text-sm text-white">Illustrative donor total: {formatCurrency(receipt.chargeCents, receipt.card.currency)}</Text><Text className="mt-2 text-sm text-white">Remaining: {formatCurrency(receipt.remainingCents, receipt.card.currency)}</Text></View>
-        <Text className="mt-4 text-xs leading-5 text-white/70">No charge, transfer, verified creditor settlement, or tax-deductible receipt occurred.</Text>
-        <Pressable accessibilityRole="button" onPress={() => { setReceipt(null); setIndex((value) => value + 1); }} className="mt-5 rounded-2xl bg-mint p-4"><Text className="text-center font-black text-pine-dark">Explore next bill →</Text></Pressable>
+  return <View className="flex-1">
+    <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 42 }}>
+      <BrandHeader mode="offline" />
+      <Text className="mt-9 text-[11px] font-bold tracking-[2px] text-pine">DIRECT RELIEF · ZERO CASH OUT</Text>
+      <Text className="mt-3 text-4xl font-black leading-[44px] tracking-tight text-ink">Relief, directly{'\n'}to a creditor.</Text>
+      <Text className="mt-3 text-sm leading-6 text-muted">Four fictional bills. Simulated payments only. No card, bank, or network connection is used.</Text>
+      {receipt ? <View className="mt-7 rounded-[28px] border border-line bg-surface p-6">
+        <View className="h-16 w-16 items-center justify-center rounded-full bg-pine"><Text className="text-3xl font-black text-canvas">✓</Text></View>
+        <Text className="mt-6 text-[11px] font-bold tracking-[2px] text-pine">SIMULATED CONFIRMATION</Text>
+        <Text className="mt-2 text-3xl font-black tracking-tight text-ink">Bill relieved.</Text>
+        <Text className="mt-3 text-sm leading-6 text-muted">{formatCurrency(receipt.donorCents, receipt.card.currency)} demo gift{receipt.matchCents > 0 ? ` plus ${formatCurrency(receipt.matchCents, receipt.card.currency)} fictional match` : ''} toward {receipt.card.billerName}.</Text>
+        <View className="mt-6 rounded-2xl border border-[#162920] bg-inset p-4">
+          <ReceiptRow label="Your contribution" value={formatCurrency(receipt.donorCents, receipt.card.currency)} />
+          {receipt.matchCents > 0 && <ReceiptRow label="Fictional sponsor match" value={`+${formatCurrency(receipt.matchCents, receipt.card.currency)}`} />}
+          <ReceiptRow label="Creditor amount" value={formatCurrency(receipt.toCreditorCents, receipt.card.currency)} emphasis />
+          <ReceiptRow label="Total paid (incl. fees)" value={formatCurrency(receipt.chargeCents, receipt.card.currency)} />
+          <ReceiptRow label="Remaining balance" value={formatCurrency(receipt.remainingCents, receipt.card.currency)} badge />
+        </View>
+        <Text className="mt-4 text-[11px] leading-5 text-muted">No charge, transfer, verified creditor settlement, or tax-deductible receipt occurred.</Text>
+        <View className="mt-6"><PrimaryButton label="Explore next bill  →" onPress={() => { setReceipt(null); setIndex((value) => value + 1); }} /></View>
       </View> : <>
-        <View className="mt-6 flex-row justify-between"><Text className="text-xs font-black tracking-widest text-pine">PITCH DECK</Text><Text className="text-xs font-bold text-muted">{index % PITCH_CARDS.length + 1} / {PITCH_CARDS.length}</Text></View>
+        <View className="mt-8 flex-row justify-between"><Text className="text-[11px] font-bold tracking-widest text-ink">PITCH DECK</Text><Text className="text-xs font-bold text-muted">{index % PITCH_CARDS.length + 1} / {PITCH_CARDS.length}</Text></View>
         <SwipeableBillCard key={`${card.id}-${index}-${selected ? 'open' : 'closed'}`} bill={asFeedBill(card, balances[card.id] ?? card.balanceCents)} onGive={() => openCheckout(card)} onPass={() => setIndex((value) => value + 1)} />
-        <Pressable accessibilityRole="button" onPress={() => { setBalances({ ...startingBalances }); setIndex(0); }} className="mt-5 p-3"><Text className="text-center text-sm font-bold text-pine">Reset demo balances</Text></Pressable>
+        <Pressable accessibilityRole="button" onPress={() => { setBalances({ ...startingBalances }); setIndex(0); }} className="mt-5 min-h-11 items-center justify-center"><Text className="text-sm font-semibold text-mint">Reset demo balances</Text></Pressable>
       </>}
-      <Text className="mt-5 text-center text-xs leading-5 text-muted">US card-fee estimates are illustrative. EUR cards show a proposed SEPA creditor-reference flow; EU payment rails and pricing are not implemented.</Text>
+      <Text className="mt-6 text-center text-[11px] leading-5 text-muted">US card-fee estimates are illustrative. EUR cards show a proposed SEPA creditor-reference flow; EU payment rails and pricing are not implemented.</Text>
     </ScrollView>
-    <BottomSheetModal ref={sheet} snapPoints={['82%']} onDismiss={() => setSelected(null)} backgroundStyle={{ backgroundColor: '#F6F6F1' }}>
+    <BottomSheetModal ref={sheet} snapPoints={['88%']} onDismiss={() => setSelected(null)} backgroundStyle={{ backgroundColor: COLORS.surface, borderColor: COLORS.border, borderWidth: 1 }} handleIndicatorStyle={{ backgroundColor: '#4B6354', width: 48, height: 5 }}>
       <BottomSheetScrollView contentContainerStyle={{ padding: 20, paddingBottom: 44 }}>
-        <Text className="text-xs font-black tracking-widest text-pine">OFFLINE CHECKOUT SIMULATION</Text>
-        <Text className="mt-2 text-2xl font-black text-ink">{selected?.billerName}</Text>
-        <Text className="mt-2 text-sm leading-5 text-muted">{selected?.railLabel}. No payment is submitted.</Text>
-        <Text className="mt-6 text-xs font-black tracking-widest text-pine">YOUR CONTRIBUTION</Text>
-        <View className="mt-3 flex-row gap-2">{([25, 50, 100] as const).map((value) => <Pressable key={value} accessibilityRole="button" onPress={() => setPercentage(value)} className={`min-h-12 flex-1 items-center justify-center rounded-xl ${percentage === value ? 'bg-pine-dark' : 'bg-white'}`}><Text className={`font-black ${percentage === value ? 'text-white' : 'text-ink'}`}>{value}%</Text></Pressable>)}</View>
-        <Text className="mt-4 text-2xl font-black text-ink">{selected ? formatCurrency(donorCents, selected.currency) : ''}</Text>
-        <Pressable accessibilityRole="switch" accessibilityState={{ checked: coverProcessingFee }} onPress={() => setCoverProcessingFee((value) => !value)} className="mt-5 rounded-2xl bg-mint p-4"><Text className="font-bold text-pine-dark">{coverProcessingFee ? '✓ ' : '○ '}Cover estimated processing fee</Text></Pressable>
-        {split?.requiresDonorFeeCoverage && <Text className="mt-2 text-sm font-bold text-amber">Cover processing to continue; no sponsor fee buffer is available.</Text>}
-        <Text className="mt-6 text-xs font-black tracking-widest text-pine">OPTIONAL PLATFORM TIP</Text>
-        <View className="mt-3 flex-row gap-2">{([0, 10, 15, 20] as const).map((value) => <Pressable key={value} accessibilityRole="button" onPress={() => setTipPercentage(value)} className={`min-h-11 flex-1 items-center justify-center rounded-xl ${tipPercentage === value ? 'bg-pine-dark' : 'bg-white'}`}><Text className={`font-black ${tipPercentage === value ? 'text-white' : 'text-ink'}`}>{value}%</Text></Pressable>)}</View>
-        {split && selected && <View className="mt-5 rounded-2xl bg-white p-5"><Text className="font-black text-ink">Illustrative split</Text><Text className="mt-3 text-sm text-muted">Donor: {formatCurrency(donorCents, selected.currency)}</Text><Text className="mt-2 text-sm text-muted">Fictional match: {formatCurrency(matchCents, selected.currency)}</Text><Text className="mt-2 text-sm text-muted">To creditor in simulation: {formatCurrency(split.totalDisbursementToCreditorCents, selected.currency)}</Text><Text className="mt-2 text-sm text-muted">Processing estimate: {formatCurrency(split.stripeFeeCents, selected.currency)}</Text><Text className="mt-2 text-sm text-muted">Optional tip: {formatCurrency(split.platformTipCents, selected.currency)}</Text><Text className="mt-4 text-lg font-black text-pine-dark">Demo total: {formatCurrency(split.totalChargeCents, selected.currency)}</Text></View>}
+        <Text className="text-[11px] font-bold tracking-[2px] text-pine">OFFLINE CHECKOUT SIMULATION</Text>
+        <Text className="mt-2 text-2xl font-black tracking-tight text-ink">{selected?.billerName}</Text>
+        <Text className="mt-2 text-xs leading-5 text-muted">{selected?.railLabel}. No payment is submitted.</Text>
+        <View className="mt-5 rounded-[24px] border border-line bg-inset p-5">
+          <Text className="text-[11px] font-bold tracking-widest text-pine">01  YOUR CONTRIBUTION</Text>
+          <View className="mt-4 flex-row gap-2">{([25, 50, 100] as const).map((value) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: percentage === value && !customAmount }} onPress={() => { setPercentage(value); setCustomAmount(''); }} className={`min-h-12 flex-1 items-center justify-center rounded-xl border ${percentage === value && !customAmount ? 'border-pine bg-pine' : 'border-line bg-surface'}`}><Text className={`text-sm font-black ${percentage === value && !customAmount ? 'text-canvas' : 'text-muted'}`}>{value === 100 ? 'Full' : `${value}%`}</Text></Pressable>)}</View>
+          <TextInput className="mt-3 min-h-12 rounded-xl border border-line bg-surface px-4 text-base text-ink" placeholder="Or enter a custom amount" placeholderTextColor="#66766E" selectionColor={COLORS.emerald} keyboardType="decimal-pad" value={customAmount} onChangeText={setCustomAmount} />
+          {customAmount && !split && <Text className="mt-2 text-xs text-coral">Enter an amount above zero and within the remaining balance.</Text>}
+          <Text className="mt-4 text-2xl font-black text-ink">{selected ? formatCurrency(donorCents, selected.currency) : ''}</Text>
+        </View>
+        <Pressable accessibilityRole="switch" accessibilityState={{ checked: coverProcessingFee }} onPress={() => setCoverProcessingFee((value) => !value)} className="mt-4 flex-row items-center rounded-[24px] border border-line bg-surface p-5"><View className={`mr-3 h-7 w-7 items-center justify-center rounded-lg ${coverProcessingFee ? 'bg-pine' : 'border border-line bg-inset'}`}><Text className="font-black text-canvas">{coverProcessingFee ? '✓' : ''}</Text></View><View className="flex-1"><Text className="text-sm font-bold text-ink">Cover estimated processing fee</Text><Text className="mt-1 text-xs text-muted">The full demo contribution reaches the creditor.</Text></View></Pressable>
+        {split?.requiresDonorFeeCoverage && <View className="mt-3 rounded-2xl border border-[#543B14] bg-cream p-3"><Text className="text-sm font-bold text-amber">Fee buffer depleted. Please cover card processing.</Text></View>}
+        <Text className="mt-6 text-[11px] font-bold tracking-widest text-pine">02  OPTIONAL PLATFORM TIP</Text>
+        <View className="mt-3 flex-row gap-2">{([0, 10, 15, 20] as const).map((value) => <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: tipPercentage === value }} onPress={() => setTipPercentage(value)} className={`min-h-11 flex-1 items-center justify-center rounded-xl border ${tipPercentage === value ? 'border-pine bg-pine' : 'border-line bg-inset'}`}><Text className={`font-black ${tipPercentage === value ? 'text-canvas' : 'text-muted'}`}>{value}%</Text></Pressable>)}</View>
+        {split && selected && <View className="mt-5 rounded-[24px] border border-line bg-inset p-5"><Text className="text-[11px] font-bold tracking-widest text-pine">03  ILLUSTRATIVE SPLIT</Text><View className="mt-4">
+          <ReceiptRow label="Your contribution" value={formatCurrency(donorCents, selected.currency)} />
+          {matchCents > 0 && <ReceiptRow label="Fictional sponsor match" value={`+${formatCurrency(matchCents, selected.currency)}`} />}
+          <ReceiptRow label="To creditor in simulation" value={formatCurrency(split.totalDisbursementToCreditorCents, selected.currency)} emphasis />
+          <ReceiptRow label="Processing estimate" value={formatCurrency(split.stripeFeeCents, selected.currency)} />
+          <ReceiptRow label="Optional tip" value={formatCurrency(split.platformTipCents, selected.currency)} />
+          <View className="mt-3 h-px bg-line" /><View className="mt-2"><ReceiptRow label="Demo donor total" value={formatCurrency(split.totalChargeCents, selected.currency)} emphasis /></View>
+        </View></View>}
         {selected?.currency === 'EUR' && <Text className="mt-3 text-xs leading-5 text-amber">EUR fee numbers use the US sandbox formula solely to illustrate the screen. EU processor terms are unconfigured.</Text>}
-        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: accepted }} onPress={() => setAccepted((value) => !value)} className="mt-5 rounded-2xl bg-white p-4"><Text className="text-sm leading-5 text-ink">{accepted ? '☑' : '☐'} I understand this is a fictional offline simulation, with no payment or charitable tax receipt.</Text></Pressable>
-        <Pressable accessibilityRole="button" disabled={!split || split.requiresDonorFeeCoverage || !accepted} onPress={simulate} className={`mt-5 min-h-14 items-center justify-center rounded-2xl p-4 ${split && !split.requiresDonorFeeCoverage && accepted ? 'bg-pine' : 'bg-muted'}`}><Text className="font-black text-white">Simulate direct creditor payment →</Text></Pressable>
+        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: accepted }} onPress={() => setAccepted((value) => !value)} className="mt-5 flex-row rounded-2xl border border-line bg-surface p-4"><View className={`mr-3 h-6 w-6 items-center justify-center rounded-md ${accepted ? 'bg-pine' : 'border border-line bg-inset'}`}><Text className="font-black text-canvas">{accepted ? '✓' : ''}</Text></View><Text className="flex-1 text-xs leading-5 text-muted">I understand this is a fictional offline simulation, with no payment or charitable tax receipt.</Text></Pressable>
+        <View className="mt-5"><PrimaryButton disabled={!split || split.requiresDonorFeeCoverage || !accepted} onPress={simulate} label="Simulate creditor payment  →" /></View>
       </BottomSheetScrollView>
     </BottomSheetModal>
   </View>;

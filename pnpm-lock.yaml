@@ -139,6 +139,9 @@ importers:
         specifier: ^3.25.76
         version: 3.25.76
     devDependencies:
+      '@babel/plugin-transform-react-jsx':
+        specifier: ^7.29.7
+        version: 7.29.7(@babel/core@7.29.7(supports-color@8.1.1))(supports-color@8.1.1)
       '@types/react':
         specifier: ~19.1.10
         version: 19.1.17

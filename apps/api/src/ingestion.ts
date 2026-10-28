@@ -66,8 +66,8 @@ export async function processUploadedBill(billId: string, services: Services, ex
     const merchantId = result.merchantId && isVerifiedDemoMerchantForCategory(result.merchantId, bill.category)
       && bill.billerName?.trim().toLowerCase() === result.billerName.trim().toLowerCase() ? result.merchantId : null;
     const needsOcrReview = result.confidence < 85 || !merchantId;
-    const nextStatus = duplicate ? 'rejected' : vetting.outcome === 'rejected' ? 'rejected' : needsOcrReview || vetting.outcome === 'pending_review' ? 'pending_review' : 'verified';
-    const rejectionReason = duplicate ? 'This bill appears to duplicate a recent submission.' : vetting.reason ?? (needsOcrReview ? 'The creditor or document needs manual review.' : null);
+    const nextStatus = bill.countryCode !== 'US' || duplicate ? 'rejected' : vetting.outcome === 'rejected' ? 'rejected' : needsOcrReview || vetting.outcome === 'pending_review' ? 'pending_review' : 'verified';
+    const rejectionReason = bill.countryCode !== 'US' ? 'Connected bill intake is currently limited to the US sandbox.' : duplicate ? 'This bill appears to duplicate a recent submission.' : vetting.reason ?? (needsOcrReview ? 'The creditor or document needs manual review.' : null);
     await tx.update(bills).set({
       billerName: result.billerName,
       accountHolderName: result.accountHolderName,

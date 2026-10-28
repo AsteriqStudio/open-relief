@@ -44,6 +44,7 @@ export const pitchDemoCards = pgTable('pitch_demo_cards', {
 export const bills = pgTable('bills', {
   id: uuid('id').primaryKey(),
   recipientId: uuid('recipient_id').notNull().references(() => users.id),
+  countryCode: text('country_code').default('US').notNull(),
   billerName: text('biller_name'),
   accountHolderName: text('account_holder_name'),
   isShutoffNotice: boolean('is_shutoff_notice').default(false).notNull(),
@@ -75,6 +76,7 @@ export const bills = pgTable('bills', {
   index('bills_feed_idx').on(table.status, table.createdAt),
   index('bills_duplicate_idx').on(table.duplicateFingerprint, table.createdAt),
   check('bills_document_size_check', sql`${table.documentSizeBytes} > 0 AND ${table.documentSizeBytes} <= 10485760`),
+  check('bills_country_code_check', sql`${table.countryCode} ~ '^[A-Z]{2}$'`),
   check('bills_balance_check', sql`(${table.statementBalanceCents} IS NULL AND ${table.remainingBalanceCents} IS NULL) OR (${table.statementBalanceCents} > 0 AND ${table.remainingBalanceCents} >= 0 AND ${table.remainingBalanceCents} <= ${table.statementBalanceCents})`),
 ]);
 

@@ -73,14 +73,14 @@ jobs:
       - name: Publish labeled prerelease
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: phase11-demo-rc3
-          name: Open Relief full-flow offline walkthrough RC3
+          tag_name: phase11-demo-rc4
+          name: Open Relief service-readiness walkthrough RC4
           prerelease: true
           make_latest: false
           body: |
-            Four-tab offline walkthrough: donor deck and checkout, fictional recipient intake, local sample review queue, activity dashboard, and legal drafts. Seven fictional bills cover electric, water, gas, medical, and telecom categories.
+            Four-tab offline walkthrough with donor, recipient, review, and activity screens. The Profile tab now explains the US sandbox, German concept, UK gap, and future country-by-country expansion. Seven fictional bills cover electric, water, gas, medical, and telecom categories.
             No charge, document upload, OCR, verified creditor decision, disbursement, or charitable tax receipt occurs in this APK. The connected sandbox requires a separate API environment.
-            Built with an embedded JavaScript bundle and demo signing key for Android sideloading. If Android rejects an update because of a signing mismatch, uninstall the prior demo before installing RC3; local demo state will reset.
+            Built with an embedded JavaScript bundle and demo signing key for Android sideloading. If Android rejects an update because of a signing mismatch, uninstall the prior demo before installing RC4; local demo state will reset.
           files: |
             builds/open-relief-demo.apk
             builds/open-relief-demo.apk.sha256

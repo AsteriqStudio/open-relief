@@ -78,7 +78,7 @@ export function RecipientScreen() {
   return <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 42 }}>
     <Text className="text-[11px] font-bold tracking-[2px] text-pine">NEED RELIEF</Text>
     <Text className="mt-3 text-4xl font-black tracking-tight text-ink">One bill.{'\n'}A path forward.</Text>
-    <Text className="mt-3 text-sm leading-6 text-muted">Submit an overdue bill for demo review. Donors pay the creditor account directly; you never receive cash.</Text>
+    <Text className="mt-3 text-sm leading-6 text-muted">Submit a US overdue bill for sandbox review. Payments are simulated to a demo creditor account; you never receive cash.</Text>
     <View className="mt-6 flex-row items-center rounded-2xl border border-[#24563F] bg-[#0D2A1D] p-4"><Text className="mr-3 text-xl font-black text-mint">✓</Text><Text className="flex-1 text-xs font-semibold leading-5 text-mint">Your bill stays off the donor feed until review is complete.</Text></View>
     <View className="mt-5 rounded-[24px] border border-line bg-surface p-5">
       <Text className="text-[11px] font-black tracking-widest text-pine">01  BILL DETAILS</Text>

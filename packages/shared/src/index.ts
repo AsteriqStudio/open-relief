@@ -5,3 +5,4 @@ export * from './schemas/vetting.js';
 export * from './schemas/legal.js';
 export * from './utils/feeEngine.js';
 export * from './pitchDeck.js';
+export * from './markets.js';

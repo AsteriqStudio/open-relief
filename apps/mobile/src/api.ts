@@ -6,6 +6,7 @@ import { LEGAL_TERMS_VERSION } from '@open-relief/shared';
 const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? (Platform.OS === 'web' ? window.location.origin : 'http://127.0.0.1:3000');
 const BillSchema = z.object({
   id: z.string().uuid(),
+  countryCode: z.string().regex(/^[A-Z]{2}$/),
   billerName: z.string().nullable(),
   category: z.enum(['electric', 'water', 'gas', 'medical', 'telecom']),
   zipCode: z.string().nullable(),
@@ -96,7 +97,7 @@ export async function uploadBill(input: {
   }).parse(await request('/api/bills/upload-url', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ category: input.category, zipCode: input.zipCode, story: input.story, mimeType: input.mimeType, sizeBytes: file.size, declaredBillerName: input.declaredBillerName, attestation: { accepted: input.attestationAccepted, termsVersion: LEGAL_TERMS_VERSION } }),
+    body: JSON.stringify({ countryCode: 'US', category: input.category, zipCode: input.zipCode, story: input.story, mimeType: input.mimeType, sizeBytes: file.size, declaredBillerName: input.declaredBillerName, attestation: { accepted: input.attestationAccepted, termsVersion: LEGAL_TERMS_VERSION } }),
   }, token));
   const form = new FormData();
   for (const [key, value] of Object.entries(details.fields)) form.append(key, value);

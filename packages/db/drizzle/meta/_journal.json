@@ -64,6 +64,13 @@
       "when": 1793206371077,
       "tag": "0008_complete_chronomancer",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793231512327,
+      "tag": "0009_wakeful_dragon_man",
+      "breakpoints": true
     }
   ]
 }

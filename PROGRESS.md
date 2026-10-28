@@ -33,6 +33,9 @@ Update this file when a task changes status. Keep implementation claims tied to 
 - [x] Replace illustrative profile impact figures with authenticated totals from completed sandbox donations. Keep fictional pitch creditors, payment status, legal status, and retention language explicit.
 - [x] RC3 offline APK: expose four navigable phone tabs for giving, fictional recipient intake, simulated review, and a local activity/legal dashboard. Link sample review decisions to the donor deck and simulated gifts to balances and profile activity.
 - [x] Expand fictional pitch cards to all five supported bill categories while preserving the two EUR concept cards and sandbox fee calculation.
+- [x] Make connected bill intake explicitly US-only, persist its country, and block non-US bills from the US feed, review approval, and checkout. Show current market states in the offline Profile tab.
+- [x] Write a concrete pilot operating plan for fee funding, B2B revenue, market expansion, and launch evidence without changing the approved sandbox fee formula.
+- [x] Prepare RC4 as a separate APK release so the updated market explanation does not overwrite RC3.
 
 ## Verification record
 
@@ -46,6 +49,7 @@ Update this file when a task changes status. Keep implementation claims tied to 
 - Obsidian/emerald redesign: `pnpm run typecheck` passed; `pnpm test` passed all 19 tests with `.env.local` loaded; Android and web Expo exports compiled. A new integration assertion checks authenticated donor impact totals.
 - GitHub Actions run `40746601104` succeeded and published `phase11-demo-rc2`. The downloaded RC2 APK is 89,873,289 bytes, SHA-256 `91ccb7e11b427e2819fae8972a332f4a8e6712a99a8d68ba816bbf2998f3914f`, includes `assets/index.android.bundle`, and passes `apksigner verify`. Package `org.openrelief.app`, version code 2, minimum Android SDK 24.
 - RC3 offline flow: `pnpm run typecheck` passed; `pnpm test` passed all 22 tests with `.env.local` loaded; Android and web Expo exports compiled. Three new mobile model tests cover category breadth, sample review state, and gift-record constraints.
+- Market readiness update: migration `0009` applied locally; `pnpm run typecheck` passed; `pnpm test` passed all 22 tests with `.env.local` loaded; Android Expo export compiled. The end-to-end test checks that DE, GB, and FR intake is refused and that a foreign-coded bill is hidden from the US feed and refused by checkout.
 - GitHub Actions run `40757061612` succeeded and published `phase11-demo-rc3`. The downloaded APK is 89,895,969 bytes, SHA-256 `d3d525ef5d82118989f5ab3d97d202a8185a120ef282b494d9e600e602481ad7`, passes `apksigner verify`, reports package `org.openrelief.app` version 0.3.0 (code 3), and contains `assets/index.android.bundle` with all four walkthrough screen labels. Its signing certificate fingerprint matches RC2; physical-device installation is untested here.
 
 ## Boundaries and next gates

@@ -6,7 +6,7 @@ import { bills, sponsorshipAllocations, sponsorshipPools, transactions } from '@
 import { decryptAccountNumber } from '@open-relief/db/security/encryption';
 import { LegalAcceptanceSchema } from '@open-relief/shared';
 import type { registerAuth } from '../auth.js';
-import { createDonationIntent, FeeCoverageRequiredError, SponsorMatchChangedError, settleMockPayment } from '../payments.js';
+import { createDonationIntent, FeeCoverageRequiredError, SponsorMatchChangedError, UnsupportedMarketError, settleMockPayment } from '../payments.js';
 import type { Services } from '../services.js';
 import { createStripePaymentsClient } from '../stripeTest.js';
 
@@ -52,7 +52,7 @@ export function registerDonationRoutes(app: FastifyInstance, services: Services,
       sponsorPoolId: input.sponsorPoolId,
       expectedSponsorMatchCents: input.expectedSponsorMatchCents,
     }, services, provider.client); }
-    catch (error) { if (error instanceof FeeCoverageRequiredError) return reply.code(422).send({ error: error.message, requiresDonorFeeCoverage: true }); if (error instanceof SponsorMatchChangedError) return reply.code(409).send({ error: error.message }); throw error; }
+    catch (error) { if (error instanceof FeeCoverageRequiredError) return reply.code(422).send({ error: error.message, requiresDonorFeeCoverage: true }); if (error instanceof UnsupportedMarketError) return reply.code(422).send({ error: error.message }); if (error instanceof SponsorMatchChangedError) return reply.code(409).send({ error: error.message }); throw error; }
     return reply.code(201).send({ ...result, mode: provider.mode });
   });
 

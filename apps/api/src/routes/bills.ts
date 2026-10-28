@@ -6,12 +6,13 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { bills, sponsorshipPools } from '@open-relief/db';
 import { decryptAccountNumber } from '@open-relief/db/security/encryption';
-import { BillCategorySchema, LEGAL_TERMS_VERSION, LegalAcceptanceSchema } from '@open-relief/shared';
+import { BillCategorySchema, CountryCodeSchema, LEGAL_TERMS_VERSION, LegalAcceptanceSchema, canSubmitConnectedSandboxBill } from '@open-relief/shared';
 import type { registerAuth } from '../auth.js';
 import type { Services } from '../services.js';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const UploadRequestSchema = z.object({
+  countryCode: CountryCodeSchema,
   category: z.enum(['electric', 'water', 'gas', 'medical', 'telecom']),
   mimeType: z.enum(['image/jpeg', 'image/png', 'application/pdf']),
   sizeBytes: z.number().int().positive().max(MAX_BYTES),
@@ -26,6 +27,9 @@ const FeedQuerySchema = z.object({ category: BillCategorySchema.optional() }).st
 export function registerBillRoutes(app: FastifyInstance, services: Services, requireAuth: ReturnType<typeof registerAuth>) {
   app.post('/api/bills/upload-url', { preHandler: requireAuth({ roles: ['recipient'] }) }, async (request, reply) => {
     const input = UploadRequestSchema.parse(request.body);
+    if (!canSubmitConnectedSandboxBill(input.countryCode)) {
+      return reply.code(422).send({ error: 'Connected bill intake is currently limited to the US sandbox. No public payment service is available.' });
+    }
     const billId = randomUUID();
     const key = `bills/${billId}/original`;
     const post = await createPresignedPost(services.s3, {
@@ -38,6 +42,7 @@ export function registerBillRoutes(app: FastifyInstance, services: Services, req
     await services.db.insert(bills).values({
       id: billId,
       recipientId: request.user!.id,
+      countryCode: input.countryCode,
       category: input.category,
       billerName: input.declaredBillerName,
       documentUrl: `s3://${services.config.S3_BUCKET}/${key}`,
@@ -80,11 +85,11 @@ export function registerBillRoutes(app: FastifyInstance, services: Services, req
     const query = FeedQuerySchema.parse(request.query);
     const pools = await services.db.select().from(sponsorshipPools).where(eq(sponsorshipPools.active, true)).orderBy(asc(sponsorshipPools.createdAt));
     const rows = await services.db.select({
-      id: bills.id, billerName: bills.billerName, category: bills.category, zipCode: bills.zipCode, story: bills.story,
+      id: bills.id, countryCode: bills.countryCode, billerName: bills.billerName, category: bills.category, zipCode: bills.zipCode, story: bills.story,
       statementBalanceCents: bills.statementBalanceCents, remainingBalanceCents: bills.remainingBalanceCents, status: bills.status,
       isShutoffNotice: bills.isShutoffNotice, daysUntilDisconnection: bills.daysUntilDisconnection,
       billerAccountEncrypted: bills.billerAccountEncrypted,
-    }).from(bills).where(and(inArray(bills.status, ['verified', 'funded']), query.category ? eq(bills.category, query.category) : undefined)).orderBy(desc(bills.createdAt)).limit(50);
+    }).from(bills).where(and(eq(bills.countryCode, 'US'), inArray(bills.status, ['verified', 'funded']), query.category ? eq(bills.category, query.category) : undefined)).orderBy(desc(bills.createdAt)).limit(50);
     return { bills: rows.map(({ billerAccountEncrypted, ...bill }) => ({
       ...bill,
       accountLast4: billerAccountEncrypted ? decryptAccountNumber(billerAccountEncrypted).slice(-4) : null,

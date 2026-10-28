@@ -79,6 +79,7 @@ export function registerAdminRoutes(app: FastifyInstance, services: Services, re
       if (!bill) return reply.code(404).send({ error: 'Review not found' });
       if (bill.status !== 'pending_review') return reply.code(409).send({ error: 'Review has already been decided' });
       if (input.decision === 'approve') {
+        if (bill.countryCode !== 'US') return reply.code(409).send({ error: 'Only US sandbox bills can be approved' });
         if (!bill.termsAcceptedAt || bill.termsVersion !== LEGAL_TERMS_VERSION) return reply.code(409).send({ error: 'Current recipient attestation is required for approval' });
         if (!bill.billerMerchantId || !isVerifiedDemoMerchantForCategory(bill.billerMerchantId, bill.category) || !bill.billerAccountEncrypted || !bill.statementBalanceCents || bill.remainingBalanceCents !== bill.statementBalanceCents) {
           return reply.code(409).send({ error: 'A verified demo creditor and intact bill balance are required for approval' });

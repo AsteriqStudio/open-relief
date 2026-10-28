@@ -47,8 +47,13 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     assert.equal(deniedUpload.statusCode, 401);
     const wrongRole = await app.inject({ method: 'POST', url: '/api/bills/upload-url', headers: donorHeaders, payload: {} });
     assert.equal(wrongRole.statusCode, 403);
-    const missingAttestation = await app.inject({ method: 'POST', url: '/api/bills/upload-url', headers: recipientHeaders, payload: { category: 'electric', mimeType: 'image/jpeg', sizeBytes: 100, zipCode: '48201', story: 'Past due bill', declaredBillerName: 'Demo Utility' } });
+    const missingAttestation = await app.inject({ method: 'POST', url: '/api/bills/upload-url', headers: recipientHeaders, payload: { countryCode: 'US', category: 'electric', mimeType: 'image/jpeg', sizeBytes: 100, zipCode: '48201', story: 'Past due bill', declaredBillerName: 'Demo Utility' } });
     assert.equal(missingAttestation.statusCode, 400);
+    for (const countryCode of ['DE', 'GB', 'FR']) {
+      const unavailable = await app.inject({ method: 'POST', url: '/api/bills/upload-url', headers: recipientHeaders, payload: { countryCode, category: 'electric', mimeType: 'image/jpeg', sizeBytes: 100, zipCode: '48201', story: 'Past due bill', declaredBillerName: 'Demo Utility', attestation: { accepted: true, termsVersion: 'v1.0' } } });
+      assert.equal(unavailable.statusCode, 422);
+      assert.match(unavailable.json<{ error: string }>().error, /limited to the US sandbox/);
+    }
     const signIn = await app.inject({ method: 'POST', url: '/api/auth/signin', payload: { email: donor.user.email, password: 'local test password 2026' } });
     assert.equal(signIn.statusCode, 200);
     assert.equal(signIn.json<{ user: { id: string } }>().user.id, donor.user.id);
@@ -56,7 +61,7 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     const image = await sharp({ create: { width: 3, height: 3, channels: 3, background: { r: color[0]!, g: color[1]!, b: color[2]! } } }).jpeg().withExif({ IFD0: { Copyright: 'metadata to strip' } }).toBuffer();
     const submit = async () => {
       const response = await app.inject({ method: 'POST', url: '/api/bills/upload-url', headers: recipientHeaders, payload: {
-        category: 'electric', mimeType: 'image/jpeg', sizeBytes: image.length, zipCode: '48201', story: 'Demo family facing an overdue power bill', declaredBillerName: 'Demo Utility', attestation: { accepted: true, termsVersion: 'v1.0' },
+        countryCode: 'US', category: 'electric', mimeType: 'image/jpeg', sizeBytes: image.length, zipCode: '48201', story: 'Demo family facing an overdue power bill', declaredBillerName: 'Demo Utility', attestation: { accepted: true, termsVersion: 'v1.0' },
       } });
       assert.equal(response.statusCode, 201, response.body);
       const details = response.json<{ billId: string; url: string; fields: Record<string, string> }>();
@@ -70,8 +75,9 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
       return details.billId;
     };
     const billId = await submit();
-    const [attestedBill] = await services.db.select({ termsAcceptedAt: bills.termsAcceptedAt, termsVersion: bills.termsVersion }).from(bills).where(eq(bills.id, billId));
+    const [attestedBill] = await services.db.select({ countryCode: bills.countryCode, termsAcceptedAt: bills.termsAcceptedAt, termsVersion: bills.termsVersion }).from(bills).where(eq(bills.id, billId));
     assert.ok(attestedBill?.termsAcceptedAt);
+    assert.equal(attestedBill.countryCode, 'US');
     assert.equal(attestedBill.termsVersion, 'v1.0');
     let billStatus = 'pending_ocr';
     for (let attempt = 0; attempt < 50; attempt += 1) {
@@ -91,6 +97,13 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     assert.ok(electricFeed.bills.some((bill) => bill.id === billId));
     assert.ok(electricFeed.bills.every((bill) => bill.category === 'electric'));
     assert.equal((await app.inject({ method: 'GET', url: '/api/bills/feed?category=unknown' })).statusCode, 400);
+
+    await services.db.update(bills).set({ countryCode: 'DE' }).where(eq(bills.id, billId));
+    const foreignFeed = (await app.inject({ method: 'GET', url: '/api/bills/feed' })).json<{ bills: Array<{ id: string }> }>();
+    assert.ok(!foreignFeed.bills.some((bill) => bill.id === billId));
+    const foreignIntent = await app.inject({ method: 'POST', url: '/api/donations/create-intent', headers: donorHeaders, payload: { billId, amountCents: 1000, coverProcessingFee: true, tipPercentage: 0, donorAcceptance: { accepted: true, termsVersion: 'v1.0' } } });
+    assert.equal(foreignIntent.statusCode, 422, foreignIntent.body);
+    await services.db.update(bills).set({ countryCode: 'US' }).where(eq(bills.id, billId));
 
     const missingDonorTerms = await app.inject({ method: 'POST', url: '/api/donations/create-intent', headers: donorHeaders, payload: { billId, amountCents: 1000, coverProcessingFee: true, tipPercentage: 0 } });
     assert.equal(missingDonorTerms.statusCode, 400);

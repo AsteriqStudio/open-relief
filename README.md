@@ -3,6 +3,7 @@
 A local, zero-cash **demo** for direct-to-creditor mutual aid. Recipients submit overdue bills, the mock OCR worker verifies demo billers, and donors simulate a payment that settles against the biller account. Optional Stripe test mode uses test cards and a simulated Method sandbox payment. No live charge, payout, or recipient cash transfer is implemented.
 
 See [PROGRESS.md](PROGRESS.md) for the current implementation, verification results, and remaining approval gates.
+See [the service launch plan](docs/pilot-operating-plan.md) for fee funding, commercial revenue, market expansion, and pilot go/no-go evidence.
 
 ## Run locally
 
@@ -17,6 +18,8 @@ bash scripts/start-local.sh
 The startup script creates an ignored `.env.local` with random local credentials if needed, starts PostgreSQL, Redis, and MinIO, applies migrations, seeds seven demo bills across electric, water, gas, medical, and telecom, builds the server packages, and runs the API and OCR worker. It preserves an existing `.env.local`. Stop the foreground script to stop the API and worker; use `docker compose --env-file .env.local down` to stop local services. Data volumes remain until explicitly removed.
 
 The API listens on `http://127.0.0.1:3000`. A successful `GET /health` returns `{"status":"ok"}`. `GET /api/bills/feed` lists the verified demo bills. Create a recipient or donor account in the mobile app to upload bills or simulate donations. Seeded demo users cannot sign in because they have no passwords.
+Connected bill upload now requires an explicit `countryCode: "US"`. Other country codes return HTTP 422 until a country-specific sandbox flow is built. Germany remains an offline EUR concept, and no UK flow is implemented.
+The bill's country is stored in PostgreSQL; US-only guards also apply at review approval, the donor feed, and checkout.
 
 In another terminal, run the Expo app:
 

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
-import { formatCurrency } from '@open-relief/shared';
+import { FEATURED_MARKETS, formatCurrency } from '@open-relief/shared';
 import { PrimaryButton, ReceiptRow } from './design';
 import { LegalModal } from './LegalModal';
 import type { LegalDocument } from './LegalModal';
@@ -32,6 +32,11 @@ export function OfflineProfileScreen({ gifts, submissions, onReset, onNavigate }
     <View className="mt-5 rounded-[28px] border border-line bg-surface p-5"><Text className="text-lg font-black text-ink">Explore every role</Text><Text className="mt-2 text-sm leading-5 text-muted">The offline APK includes a donor deck, sample recipient intake, and a fictional review queue.</Text>
       <View className="mt-4 flex-row flex-wrap gap-2">{([['give', 'Give relief'], ['need', 'Need help'], ['review', 'Review queue']] as const).map(([tab, label]) => <Pressable key={tab} accessibilityRole="button" onPress={() => onNavigate(tab)} className="rounded-full border border-pine bg-[#0D2A1D] px-4 py-2"><Text className="text-xs font-bold text-mint">{label} →</Text></Pressable>)}</View>
       <Text className="mt-4 text-xs leading-5 text-muted">The connected sandbox also has real sign-in, document upload, OCR, admin audit, and Stripe test checkout. Those require its API and are not active in this offline APK.</Text>
+    </View>
+    <View className="mt-5 rounded-[28px] border border-line bg-surface p-5"><Text className="text-lg font-black text-ink">Where could this work?</Text>
+      <Text className="mt-2 text-sm leading-5 text-muted">Relief can expand country by country when creditor routing, payment partners, compliance, and fee funding are ready. No country has a public service yet.</Text>
+      {FEATURED_MARKETS.map((market) => <View key={market.countryCode} className="mt-3 rounded-2xl border border-line bg-inset p-3"><Text className="text-sm font-bold text-ink">{market.name} · {market.countryCode}</Text><Text className="mt-1 text-xs leading-5 text-muted">{market.state === 'connected_sandbox' ? 'Connected US sandbox; simulated creditor settlement only.' : market.state === 'offline_concept' ? 'Fictional EUR screen concept; no connected payment rail.' : 'No country-specific flow is built yet.'}</Text></View>)}
+      <Text className="mt-3 text-xs leading-5 text-muted">Other countries can be assessed for future pilots. A card in this walkthrough does not mean local service is available.</Text>
     </View>
     <View className="mt-5 rounded-[28px] border border-line bg-surface p-5"><Text className="text-lg font-black text-ink">Legal & privacy</Text><Text className="mt-2 text-sm leading-5 text-muted">The product policies below are drafts for the connected sandbox. This offline walkthrough sends no data to its server.</Text>
       <View className="mt-5"><PrimaryButton label="Payment & legal details  →" onPress={() => setLegalDocument('payment')} outline /></View>

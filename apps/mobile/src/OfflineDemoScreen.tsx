@@ -14,7 +14,7 @@ const categoryFilters = ['all', 'electric', 'water', 'gas', 'medical', 'telecom'
 
 function asFeedBill(card: PitchCard, remainingCents: number): FeedBill {
   return {
-    id: card.id, billerName: card.billerName, category: card.category, zipCode: null, story: card.story,
+    id: card.id, countryCode: card.region, billerName: card.billerName, category: card.category, zipCode: null, story: card.story,
     statementBalanceCents: card.balanceCents, remainingBalanceCents: remainingCents, status: 'verified',
     isShutoffNotice: true, daysUntilDisconnection: card.region === 'US' ? 2 : null, accountLast4: card.accountLast4,
     sponsor: card.sponsorName ? { id: card.id, name: card.sponsorName, matchRatio: card.matchRatio, remainingMatchBudgetCents: remainingCents, remainingFeeBufferCents: 1_000 } : null,

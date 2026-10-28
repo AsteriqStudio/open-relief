@@ -61,6 +61,10 @@ export class SponsorMatchChangedError extends Error {
   constructor() { super('The sponsor match changed. Close checkout to refresh the bill before paying.'); }
 }
 
+export class UnsupportedMarketError extends Error {
+  constructor() { super('Creditor payment is unavailable outside the US sandbox.'); }
+}
+
 export async function createDonationIntent(input: z.infer<typeof CreateIntentSchema>, services: Services, stripe: IStripePaymentsClient = new MockStripePaymentsClient()) {
   const request = CreateIntentSchema.parse(input);
   const baseSplit = calculateDonationSplit({
@@ -86,6 +90,7 @@ export async function createDonationIntent(input: z.infer<typeof CreateIntentSch
     const [donor] = await tx.select({ id: users.id }).from(users).where(and(eq(users.id, request.donorId), eq(users.role, 'donor')));
     if (!donor) throw new Error('Donor not found');
     const [bill] = await tx.select().from(bills).where(eq(bills.id, request.billId)).for('update');
+    if (bill && bill.countryCode !== 'US') throw new UnsupportedMarketError();
     if (!bill || !['verified', 'funded'].includes(bill.status) || !bill.billerMerchantId || !isVerifiedDemoMerchantForCategory(bill.billerMerchantId, bill.category) || !bill.billerAccountEncrypted || bill.remainingBalanceCents === null) {
       throw new Error('Bill is not available for donation');
     }
@@ -203,7 +208,7 @@ export async function settlePayment(intentId: string, services: Services, method
     if (verified && (verified.metadata.sponsorMatchCents !== undefined || transaction.sponsorMatchCents > 0) && (verified.metadata.sponsorMatchCents !== String(transaction.sponsorMatchCents) || verified.metadata.allocationId !== (allocation?.id ?? ''))) throw new Error('Stripe sponsor metadata does not match the reservation');
     const creditorAmountCents = transaction.amountToBillCents + transaction.sponsorMatchCents;
     const [bill] = await tx.select().from(bills).where(eq(bills.id, transaction.billId)).for('update');
-    if (!bill?.billerMerchantId || !isVerifiedDemoMerchantForCategory(bill.billerMerchantId, bill.category) || !bill.billerAccountEncrypted || bill.remainingBalanceCents === null || bill.remainingBalanceCents < creditorAmountCents) {
+    if (!bill || bill.countryCode !== 'US' || !bill.billerMerchantId || !isVerifiedDemoMerchantForCategory(bill.billerMerchantId, bill.category) || !bill.billerAccountEncrypted || bill.remainingBalanceCents === null || bill.remainingBalanceCents < creditorAmountCents) {
       throw new Error('Bill cannot be settled');
     }
     const creditorAccountNumber = decryptAccountNumber(bill.billerAccountEncrypted);

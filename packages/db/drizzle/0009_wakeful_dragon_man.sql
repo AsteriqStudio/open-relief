@@ -1,0 +1,2 @@
+ALTER TABLE "bills" ADD COLUMN "country_code" text DEFAULT 'US' NOT NULL;--> statement-breakpoint
+ALTER TABLE "bills" ADD CONSTRAINT "bills_country_code_check" CHECK ("bills"."country_code" ~ '^[A-Z]{2}$');

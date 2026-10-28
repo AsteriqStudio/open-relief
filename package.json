@@ -10,7 +10,7 @@
   "scripts": {
     "build": "pnpm --filter @open-relief/shared build && pnpm --filter @open-relief/db build && pnpm --filter @open-relief/api build",
     "typecheck": "pnpm build && tsc -p tsconfig.setup.json --noEmit && pnpm --filter @open-relief/shared typecheck && pnpm --filter @open-relief/db typecheck && pnpm --filter @open-relief/api typecheck && pnpm --filter @open-relief/mobile typecheck",
-    "preview:web": "EXPO_NO_TELEMETRY=1 EXPO_OFFLINE=1 pnpm --filter @open-relief/mobile exec expo export --platform web && node --experimental-strip-types scripts/serve-web-preview.ts",
+    "preview:web": "EXPO_NO_TELEMETRY=1 EXPO_OFFLINE=1 pnpm --filter @open-relief/mobile exec expo export --platform web --output-dir dist-web && node --experimental-strip-types scripts/serve-web-preview.ts",
     "test": "pnpm --filter @open-relief/shared test && pnpm --filter @open-relief/db test && pnpm --filter @open-relief/api test"
   },
   "devDependencies": {

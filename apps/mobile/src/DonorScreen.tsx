@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Share, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Share, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { getDonationReceipt, getFeed } from './api';
 import type { DonationReceipt, FeedBill } from './api';
@@ -22,13 +22,15 @@ function ImpactCelebration({ confirmation, receipt, onClose }: { confirmation: C
     if (!receipt) return;
     await Share.share({ message: `Open Relief payment confirmation\n${summary}\nReference: ${receipt.methodDisbursementId ?? receipt.id}\n${receipt.taxNotice}` });
   }
-  return <Animated.View style={animatedStyle} className="mt-4 rounded-3xl bg-emerald-950 p-6 shadow-lg">
-    <View className="h-14 w-14 items-center justify-center rounded-full bg-emerald-400"><Text className="text-3xl font-black text-emerald-950">✓</Text></View>
-    <Text className="mt-5 text-2xl font-black text-white">{confirmed ? 'Relief recorded' : 'Payment received'}</Text>
-    <Text className="mt-3 text-base leading-6 text-emerald-50">{summary}</Text>
-    {receipt ? <><View className="mt-5 rounded-2xl bg-emerald-900 p-4"><Text className="font-bold text-white">Non-deductible payment confirmation</Text><Text className="mt-2 text-sm text-emerald-100">To creditor: {dollars(receipt.amountToBillCents)} · Test total: {dollars(receipt.totalChargeCents)}</Text><Text className="mt-2 text-xs leading-4 text-emerald-100">{receipt.taxNotice}</Text></View><Pressable accessibilityRole="button" onPress={() => void shareReceipt()} className="mt-4 rounded-2xl bg-white p-4"><Text className="text-center font-bold text-emerald-950">Share confirmation</Text></Pressable></> : <Text className="mt-4 text-sm text-emerald-100">The confirmation becomes available after the webhook records the creditor payment.</Text>}
-    <Pressable accessibilityRole="button" onPress={onClose} className="mt-4 p-2"><Text className="text-center font-semibold text-emerald-100">Back to bills</Text></Pressable>
-  </Animated.View>;
+  return <Animated.View style={animatedStyle} className="mt-5"><View className="overflow-hidden rounded-3xl bg-pine-dark p-6 shadow-lg">
+    <View className="absolute -right-16 -top-16 h-56 w-56 rounded-full border border-white/10" />
+    <View className="h-14 w-14 items-center justify-center rounded-2xl bg-mint"><Text className="text-3xl font-black text-pine-dark">✓</Text></View>
+    <Text className="mt-7 text-xs font-bold tracking-widest text-mint">DIRECT-TO-CREDITOR RELIEF</Text>
+    <Text className="mt-2 text-3xl font-black text-white">{confirmed ? 'Relief recorded.' : 'Payment received.'}</Text>
+    <Text className="mt-4 text-base leading-6 text-white/80">{summary}</Text>
+    {receipt ? <><View className="mt-6 rounded-2xl bg-white/10 p-5"><Text className="text-xs font-bold tracking-widest text-mint">PAYMENT CONFIRMATION</Text><View className="mt-4 flex-row justify-between"><Text className="text-sm text-white/80">Paid to creditor</Text><Text className="font-black text-white">{dollars(receipt.amountToBillCents)}</Text></View><View className="mt-3 flex-row justify-between"><Text className="text-sm text-white/80">Test total</Text><Text className="font-black text-white">{dollars(receipt.totalChargeCents)}</Text></View><Text className="mt-4 text-xs leading-5 text-white/70">{receipt.taxNotice}</Text></View><Pressable accessibilityRole="button" onPress={() => void shareReceipt()} className="mt-5 min-h-14 items-center justify-center rounded-2xl bg-mint"><Text className="font-black text-pine-dark">Share confirmation</Text></Pressable></> : <Text className="mt-5 text-sm text-mint">Creditor confirmation will appear after the signed webhook is recorded.</Text>}
+    <Pressable accessibilityRole="button" onPress={onClose} className="mt-4 p-3"><Text className="text-center font-bold text-white/80">Back to bills</Text></Pressable>
+  </View></Animated.View>;
 }
 
 export function DonorScreen() {
@@ -68,13 +70,16 @@ export function DonorScreen() {
   }
 
   const current = bills[index];
-  return <View className="flex-1 bg-slate-50 px-5 pt-5">
-    <Text className="text-xs font-bold uppercase tracking-widest text-emerald-700">Open Relief</Text>
-    <Text className="mt-2 text-4xl font-black text-slate-900">Make an impact.</Text>
-    <Text className="mt-2 text-sm leading-5 text-slate-600">Pay a verified demo creditor account directly. No cash goes to recipients.</Text>
+  return <View className="flex-1 bg-canvas"><ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 18, paddingBottom: 36 }}>
+    <Text className="text-[11px] font-black tracking-widest text-pine">DIRECT HELP, REAL RELIEF</Text>
+    <Text className="mt-2 text-4xl font-black leading-[42px] text-ink">Pay a bill.{"\n"}Lift a weight.</Text>
+    <Text className="mt-2 text-sm leading-5 text-muted">Choose a reviewed demo bill. Pay the creditor directly, never the recipient.</Text>
+    <View className="mt-4 flex-row items-center"><View className="h-6 w-6 items-center justify-center rounded-full bg-mint"><Text className="text-xs font-black text-pine">✓</Text></View><Text className="ml-2 text-xs font-semibold text-pine-dark">Reviewed before it reaches your feed</Text></View>
     {confirmation ? <ImpactCelebration confirmation={confirmation} receipt={receipt} onClose={() => setConfirmation(null)} />
-      : <View className="mt-5 flex-1">{loading ? <ActivityIndicator /> : current ? <SwipeableBillCard key={`${current.id}-${selectedBill ? 'open' : 'closed'}`} bill={current} onGive={() => setSelectedBill(current)} onPass={() => setIndex((value) => value + 1)} /> : <View className="mt-12 rounded-3xl bg-white p-7"><Text className="text-xl font-bold text-slate-900">You are all caught up.</Text><Text className="mt-2 text-slate-600">Check back for more verified demo bills.</Text><Pressable onPress={() => void refresh()} className="mt-5 rounded-2xl bg-emerald-600 p-4"><Text className="text-center font-bold text-white">Refresh feed</Text></Pressable></View>}</View>}
-    {error && <Text className="mb-3 text-sm text-red-700">{error}</Text>}
+      : <View className="mt-3"><View className="flex-row items-center justify-between"><Text className="text-xs font-black tracking-widest text-pine">BILLS NEEDING HELP</Text><Text className="text-xs font-bold text-muted">{loading ? 'Loading' : `${Math.min(index + 1, bills.length)} / ${bills.length}`}</Text></View>
+        {loading ? <View className="mt-5 rounded-3xl bg-white p-10"><ActivityIndicator color="#176B5D" /></View> : current ? <SwipeableBillCard key={`${current.id}-${selectedBill ? 'open' : 'closed'}`} bill={current} onGive={() => setSelectedBill(current)} onPass={() => setIndex((value) => value + 1)} /> : <View className="mt-5 rounded-3xl border border-line bg-white p-7"><Text className="text-2xl font-black text-ink">You are all caught up.</Text><Text className="mt-2 text-sm leading-6 text-muted">Check back for more verified demo bills.</Text><Pressable onPress={() => void refresh()} className="mt-6 rounded-2xl bg-pine p-4"><Text className="text-center font-bold text-white">Refresh feed</Text></Pressable></View>}</View>}
+    {error && <Text className="mt-4 text-sm font-medium text-red-700">{error}</Text>}
+  </ScrollView>
     <CheckoutSheet bill={selectedBill} onClose={() => setSelectedBill(null)} onComplete={handleComplete} />
   </View>;
 }

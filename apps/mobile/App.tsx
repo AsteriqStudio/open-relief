@@ -23,13 +23,16 @@ function SignedInApp() {
   if (!auth.user) return <AuthScreen />;
   const mainLabel = auth.user.role === 'recipient' ? 'Need Help' : auth.user.role === 'donor' ? 'Give Help' : 'Admin Review';
   return <GestureHandlerRootView style={{ flex: 1 }}>
-    <SafeAreaProvider><BottomSheetModalProvider><SafeAreaView className="flex-1 bg-slate-50">
+    <SafeAreaProvider><BottomSheetModalProvider><SafeAreaView className="flex-1 bg-canvas">
       <StatusBar style="dark" />
-      <View className="flex-row items-center justify-between px-5 py-2"><Text className="text-slate-600">{auth.user.email}</Text><Text className="font-semibold capitalize text-teal-700">{auth.user.role}</Text></View>
+      <View className="flex-row items-center justify-between border-b border-line bg-canvas px-5 py-3">
+        <View className="flex-row items-center"><View className="h-9 w-9 items-center justify-center rounded-xl bg-pine-dark"><Text className="text-sm font-black text-white">or.</Text></View><View className="ml-3"><Text className="text-xs font-black tracking-widest text-ink">OPEN RELIEF</Text><Text className="text-[10px] font-medium tracking-wide text-muted">DIRECT-TO-CREDITOR AID</Text></View></View>
+        <View className="rounded-full border border-line bg-white px-3 py-1.5"><Text className="text-xs font-bold capitalize text-pine">{auth.user.role} · demo</Text></View>
+      </View>
       {tab === 'profile' ? <ProfileScreen /> : auth.user.role === 'recipient' ? <RecipientScreen /> : auth.user.role === 'donor' ? <DonorScreen /> : <AdminReviewScreen />}
-      <View className="flex-row border-t border-slate-200 bg-white">
-        <Pressable onPress={() => setTab('main')} className="flex-1 p-4"><Text className={`text-center font-semibold ${tab === 'main' ? 'text-teal-700' : 'text-slate-500'}`}>{mainLabel}</Text></Pressable>
-        <Pressable onPress={() => setTab('profile')} className="flex-1 p-4"><Text className={`text-center font-semibold ${tab === 'profile' ? 'text-teal-700' : 'text-slate-500'}`}>Profile</Text></Pressable>
+      <View className="flex-row border-t border-line bg-white px-3 pb-1 pt-2">
+        <Pressable accessibilityRole="tab" accessibilityState={{ selected: tab === 'main' }} onPress={() => setTab('main')} className={`flex-1 items-center rounded-2xl p-3 ${tab === 'main' ? 'bg-mint' : 'bg-white'}`}><Text className={`text-sm font-bold ${tab === 'main' ? 'text-pine-dark' : 'text-muted'}`}>{mainLabel}</Text></Pressable>
+        <Pressable accessibilityRole="tab" accessibilityState={{ selected: tab === 'profile' }} onPress={() => setTab('profile')} className={`flex-1 items-center rounded-2xl p-3 ${tab === 'profile' ? 'bg-mint' : 'bg-white'}`}><Text className={`text-sm font-bold ${tab === 'profile' ? 'text-pine-dark' : 'text-muted'}`}>Profile</Text></Pressable>
       </View>
     </SafeAreaView></BottomSheetModalProvider></SafeAreaProvider>
   </GestureHandlerRootView>;

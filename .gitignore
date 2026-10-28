@@ -3,6 +3,7 @@ node_modules/
 .pnpm-store/
 .expo/
 dist/
+dist-web/
 coverage/
 .env
 .env.*

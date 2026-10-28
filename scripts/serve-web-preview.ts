@@ -3,7 +3,7 @@ import { createServer, request as httpRequest } from 'node:http';
 import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const root = resolve(fileURLToPath(new URL('../apps/mobile/dist/', import.meta.url)));
+const root = resolve(fileURLToPath(new URL('../apps/mobile/dist-web/', import.meta.url)));
 const mimeTypes: Record<string, string> = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',

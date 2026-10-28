@@ -28,11 +28,13 @@ Set `EXPO_PUBLIC_API_URL` to the API address reachable by your simulator or devi
 
 With the API running, use `pnpm preview:web` in a second terminal. The command exports the actual Expo UI for web and serves it on loopback port 8081 with a same-origin proxy to the local API. Create a donor account to inspect the seeded bills and try a mock payment. This preview stores its demo session in browser local storage; Stripe PaymentSheet remains native-only, and recipient document upload should be tested in the mobile app.
 
-The captured screens below come from a browser run against the seeded local API:
+The captured screens below come from the actual app running against the seeded local API. The visual system uses a warm canvas, pine and mint surfaces, readable amount hierarchy, and explicit demo creditor labels across donor and recipient flows:
 
 ![Donor feed preview](docs/previews/donor.png)
 
 ![Mock checkout preview](docs/previews/checkout.png)
+
+More screens: [welcome](docs/previews/auth.png), [payment breakdown](docs/previews/checkout-summary.png), [confirmation](docs/previews/confirmation.png), and [recipient intake](docs/previews/recipient.png).
 
 ## Validate
 

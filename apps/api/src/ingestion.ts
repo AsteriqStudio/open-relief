@@ -4,25 +4,41 @@ import { and, eq, gt, gte, inArray, lt, ne, sql, sum } from 'drizzle-orm';
 import { fileTypeFromBuffer } from 'file-type';
 import sharp from 'sharp';
 import { auditLogs, bills, transactions, users } from '@open-relief/db';
-import { encryptAccountNumber } from '@open-relief/db/security/encryption';
+import { accountLookupHash, billDuplicateFingerprint, encryptAccountNumber } from '@open-relief/db/security/encryption';
 import type { IOCRExtractor } from './ocr.js';
 import type { Services } from './services.js';
 import { assessBillEligibility } from './services/vettingService.js';
 import { isVerifiedDemoMerchantForCategory } from './biller/methodSandbox.js';
+import { DocumentTooLargeError, readDocumentBytes } from './documentBytes.js';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const MIME_TYPES = new Set(['image/jpeg', 'image/png', 'application/pdf']);
+
+async function rejectInvalidDocument(billId: string, services: Services, reason: string): Promise<void> {
+  await services.db.transaction(async (tx) => {
+    const [rejected] = await tx.update(bills).set({ status: 'rejected', rejectionReason: reason, updatedAt: new Date() }).where(and(eq(bills.id, billId), eq(bills.status, 'pending_ocr'))).returning({ id: bills.id });
+    if (rejected) await tx.insert(auditLogs).values({ id: randomUUID(), eventType: 'bill.document_rejected', billId, metadata: { reason } });
+  });
+}
 
 export async function processUploadedBill(billId: string, services: Services, extractor: IOCRExtractor): Promise<void> {
   const [bill] = await services.db.select().from(bills).where(eq(bills.id, billId));
   if (!bill || bill.status !== 'pending_ocr') return;
   const object = await services.s3.send(new GetObjectCommand({ Bucket: services.config.S3_BUCKET, Key: bill.documentKey }));
   if (!object.Body) throw new Error('Uploaded document is empty');
-  const raw = await object.Body.transformToByteArray();
+  let raw: Buffer;
+  try { raw = await readDocumentBytes(object.Body, object.ContentLength); }
+  catch (error) {
+    if (error instanceof DocumentTooLargeError) {
+      await rejectInvalidDocument(billId, services, error.message);
+      return;
+    }
+    throw error;
+  }
   const detected = await fileTypeFromBuffer(raw);
   if (!detected || !MIME_TYPES.has(detected.mime) || raw.length === 0 || raw.length > MAX_BYTES || detected.mime !== bill.documentMimeType) {
-    await services.db.update(bills).set({ status: 'rejected', updatedAt: new Date() }).where(eq(bills.id, billId));
-    throw new Error('Uploaded document failed type or size validation');
+    await rejectInvalidDocument(billId, services, 'Uploaded document failed type or size validation.');
+    return;
   }
 
   let cleaned: Buffer<ArrayBufferLike> = Buffer.from(raw);
@@ -32,10 +48,14 @@ export async function processUploadedBill(billId: string, services: Services, ex
   await services.s3.send(new PutObjectCommand({ Bucket: services.config.S3_BUCKET, Key: sanitizedKey, Body: cleaned, ContentType: detected.mime }));
 
   const result = await extractor.extract(cleaned);
-  const accountHash = createHash('sha256').update(result.accountNumber.trim()).digest('hex');
-  const fingerprint = createHash('sha256').update(`${result.billerName.trim().toLowerCase()}|${accountHash}|${result.dueDate}`).digest('hex');
+  const accountHash = accountLookupHash(result.accountNumber);
+  const fingerprint = billDuplicateFingerprint(result.billerName, result.accountNumber, result.dueDate);
+  const legacyAccountHash = createHash('sha256').update(result.accountNumber.trim()).digest('hex');
+  const legacyFingerprint = createHash('sha256').update(`${result.billerName.trim().toLowerCase()}|${legacyAccountHash}|${result.dueDate}`).digest('hex');
   await services.db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${fingerprint}))`);
+    const [currentBill] = await tx.select({ status: bills.status }).from(bills).where(eq(bills.id, billId)).for('update');
+    if (!currentBill || currentBill.status !== 'pending_ocr') return;
     const [recipient] = await tx.select().from(users).where(eq(users.id, bill.recipientId)).for('update');
     if (!recipient) throw new Error('Bill recipient no longer exists');
     const now = new Date();
@@ -47,7 +67,7 @@ export async function processUploadedBill(billId: string, services: Services, ex
     const [activeBills] = await tx.select({ total: sum(bills.remainingBalanceCents) }).from(bills)
       .where(and(eq(bills.recipientId, recipient.id), inArray(bills.status, ['verified', 'funded'])));
     const [duplicate] = await tx.select({ id: bills.id }).from(bills).where(and(
-      eq(bills.duplicateFingerprint, fingerprint),
+      inArray(bills.duplicateFingerprint, [fingerprint, legacyFingerprint]),
       ne(bills.id, billId),
       gt(bills.createdAt, new Date(Date.now() - 60 * 24 * 60 * 60 * 1000)),
       ne(bills.status, 'rejected'),

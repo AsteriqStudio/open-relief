@@ -1,10 +1,27 @@
-import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
+import { createCipheriv, createDecipheriv, createHmac, randomBytes } from 'node:crypto';
 import { z } from 'zod';
 
 const KeySchema = z.string().regex(/^[0-9a-fA-F]{64}$/, 'ENCRYPTION_KEY_HEX must contain 32 bytes encoded as 64 hexadecimal characters');
 
 function encryptionKey(): Buffer {
   return Buffer.from(KeySchema.parse(process.env.ENCRYPTION_KEY_HEX), 'hex');
+}
+
+function lookupHmac(value: string): string {
+  const lookupKey = createHmac('sha256', encryptionKey()).update('open-relief-lookup-key-v2').digest();
+  return createHmac('sha256', lookupKey).update(value).digest('hex');
+}
+
+export function accountLookupHash(accountNumber: string): string {
+  const normalized = accountNumber.trim();
+  if (!normalized) throw new RangeError('Account number cannot be empty');
+  return lookupHmac(`account:v2\0${normalized}`);
+}
+
+export function billDuplicateFingerprint(billerName: string, accountNumber: string, dueDate: string): string {
+  const normalizedName = billerName.trim().toLowerCase();
+  if (!normalizedName || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) throw new RangeError('Biller name and due date are required');
+  return lookupHmac(`bill:v2\0${normalizedName}\0${accountLookupHash(accountNumber)}\0${dueDate}`);
 }
 
 export function encryptAccountNumber(accountNumber: string): string {

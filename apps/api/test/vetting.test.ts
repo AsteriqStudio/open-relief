@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import test from 'node:test';
 import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { eq } from 'drizzle-orm';
 import sharp from 'sharp';
-import { bills, users } from '@open-relief/db';
+import { auditLogs, bills, users } from '@open-relief/db';
 import { encryptAccountNumber } from '@open-relief/db/security/encryption';
 import { buildApp } from '../dist/app.js';
 import { ApiConfigSchema } from '../dist/config.js';
@@ -89,6 +89,42 @@ test('OCR ingestion rejects ineligible bills and keeps name mismatch in review',
     const wrongCategory = await run('FINAL NOTICE: Disconnection in 4 days', 'Demo Recipient', 0, null, 'telecom');
     assert.equal(wrongCategory.status, 'pending_review');
     assert.equal(wrongCategory.billerMerchantId, null);
+
+    const duplicateJobRecipientId = await createUser();
+    const duplicateJobBillId = await createBill(duplicateJobRecipientId);
+    const extractor = { async extract() {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      return { billerName: 'Demo Utility', accountNumber: `DEMO-${duplicateJobBillId}`, dueDate: '2026-12-15', statementBalanceCents: 12_000,
+        confidence: 98, merchantId: 'mock-demo-utility', accountHolderName: 'Demo Recipient', noticeText: 'FINAL NOTICE: Disconnection in 4 days' };
+    } };
+    await Promise.all([processUploadedBill(duplicateJobBillId, services, extractor), processUploadedBill(duplicateJobBillId, services, extractor)]);
+    const duplicateJobLogs = await services.db.select({ id: auditLogs.id }).from(auditLogs).where(eq(auditLogs.billId, duplicateJobBillId));
+    assert.equal(duplicateJobLogs.length, 1);
+
+    const legacyRecipientId = await createUser();
+    const newBillId = await createBill(legacyRecipientId);
+    const oldBillId = await createBill(legacyRecipientId, 'verified');
+    const account = `DEMO-${newBillId}`;
+    const oldAccountHash = createHash('sha256').update(account).digest('hex');
+    const oldFingerprint = createHash('sha256').update(`demo utility|${oldAccountHash}|2026-12-15`).digest('hex');
+    await services.db.update(bills).set({ accountHash: oldAccountHash, duplicateFingerprint: oldFingerprint, billerAccountEncrypted: encryptAccountNumber(account), dueDate: '2026-12-15' }).where(eq(bills.id, oldBillId));
+    await processUploadedBill(newBillId, services, { async extract() {
+      return { billerName: 'Demo Utility', accountNumber: account, dueDate: '2026-12-15', statementBalanceCents: 12_000,
+        confidence: 98, merchantId: 'mock-demo-utility', accountHolderName: 'Demo Recipient', noticeText: 'FINAL NOTICE: Disconnection in 4 days' };
+    } });
+    const [legacyDuplicate] = await services.db.select({ status: bills.status, rejectionReason: bills.rejectionReason }).from(bills).where(eq(bills.id, newBillId));
+    assert.equal(legacyDuplicate?.status, 'rejected');
+    assert.match(legacyDuplicate.rejectionReason ?? '', /duplicate/);
+
+    const invalidRecipientId = await createUser();
+    const invalidBillId = await createBill(invalidRecipientId);
+    await services.s3.send(new PutObjectCommand({ Bucket: config.S3_BUCKET, Key: `vetting/${invalidBillId}.jpg`, Body: Buffer.from('not an image'), ContentType: 'image/jpeg' }));
+    await processUploadedBill(invalidBillId, services, { async extract() { throw new Error('Invalid document must not reach OCR'); } });
+    const [invalidBill] = await services.db.select({ status: bills.status, rejectionReason: bills.rejectionReason }).from(bills).where(eq(bills.id, invalidBillId));
+    assert.equal(invalidBill?.status, 'rejected');
+    assert.match(invalidBill.rejectionReason ?? '', /type or size validation/);
+    const invalidLogs = await services.db.select({ eventType: auditLogs.eventType }).from(auditLogs).where(eq(auditLogs.billId, invalidBillId));
+    assert.deepEqual(invalidLogs.map((entry) => entry.eventType), ['bill.document_rejected']);
   } finally {
     await app.close();
     await services.close();

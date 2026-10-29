@@ -72,13 +72,13 @@ export function registerBillRoutes(app: FastifyInstance, services: Services, req
     return reply.code(202).send({ billId: id, status: 'scanning' });
   });
 
-  app.get('/api/bills/:id', { preHandler: requireAuth() }, async (request, reply) => {
+  app.get('/api/bills/:id', { preHandler: requireAuth({ roles: ['recipient', 'admin'] }) }, async (request, reply) => {
     const { id } = BillIdSchema.parse(request.params);
     const [bill] = await services.db.select({ id: bills.id, recipientId: bills.recipientId, status: bills.status, remainingBalanceCents: bills.remainingBalanceCents, rejectionReason: bills.rejectionReason }).from(bills).where(eq(bills.id, id));
-    if (!bill || ((bill.status === 'pending_ocr' || bill.status === 'pending_review' || bill.status === 'rejected') && bill.recipientId !== request.user!.id && request.user!.role !== 'admin')) {
+    if (!bill || (bill.recipientId !== request.user!.id && request.user!.role !== 'admin')) {
       return reply.code(404).send({ error: 'Bill not found' });
     }
-    return { id: bill.id, status: bill.status, remainingBalanceCents: bill.remainingBalanceCents, rejectionReason: bill.recipientId === request.user!.id || request.user!.role === 'admin' ? bill.rejectionReason : null };
+    return { id: bill.id, status: bill.status, remainingBalanceCents: bill.remainingBalanceCents, rejectionReason: bill.rejectionReason };
   });
 
   app.get('/api/bills/feed', async (request) => {

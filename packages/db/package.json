@@ -25,6 +25,7 @@
     "test": "pnpm build && node --test dist/security/encryption.test.js",
     "generate": "drizzle-kit generate",
     "migrate": "tsx src/migrate.ts",
+    "backfill-fingerprints": "tsx src/backfillFingerprints.ts",
     "seed": "tsx src/seed.ts"
   },
   "dependencies": {

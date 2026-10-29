@@ -36,6 +36,8 @@ Update this file when a task changes status. Keep implementation claims tied to 
 - [x] Make connected bill intake explicitly US-only, persist its country, and block non-US bills from the US feed, review approval, and checkout. Show current market states in the offline Profile tab.
 - [x] Write a concrete pilot operating plan for fee funding, B2B revenue, market expansion, and launch evidence without changing the approved sandbox fee formula.
 - [x] Prepare RC4 as a separate APK release so the updated market explanation does not overwrite RC3.
+- [x] Guard bill-status privacy, bound admin and OCR document reads, record invalid-document rejection reasons, and prevent duplicate OCR jobs from writing repeat decisions.
+- [x] Replace new creditor account lookup hashes with keyed HMAC, keep legacy duplicate detection during migration, and add an idempotent local backfill.
 
 ## Verification record
 
@@ -52,6 +54,7 @@ Update this file when a task changes status. Keep implementation claims tied to 
 - Market readiness update: migration `0009` applied locally; `pnpm run typecheck` passed; `pnpm test` passed all 22 tests with `.env.local` loaded; Android Expo export compiled. The end-to-end test checks that DE, GB, and FR intake is refused and that a foreign-coded bill is hidden from the US feed, refused by checkout, and cannot replay an existing intent.
 - RC4 APK downloaded from the `phase11-demo-rc4` release: 89,898,201 bytes, SHA-256 `9eeca7c1c9a2f1dc88385e095e0afa8ed347d4862ddb196fa7f98366bd2c0955`. The published checksum matches, `apksigner verify` passes, certificate fingerprint `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c` matches RC3, Android reports package `org.openrelief.app` version 0.4.0 (code 4), minimum SDK 24, and its embedded bundle includes the market-readiness screen text.
 - Authentication throttling: `pnpm run typecheck` passed; `pnpm test` passed all 25 tests with `.env.local` loaded. New API tests verify the sign-in email/IP and IP-only limits, signup IP limit, HTTP 429, and `Retry-After`.
+- Service hardening: `pnpm run typecheck` passed; `pnpm test` passed all 27 tests with `.env.local` loaded. New checks cover cross-account bill access, an oversized admin document, duplicate OCR workers, a bounded stream with incorrect size metadata, invalid-document rejection/audit, keyed lookup hashes, and legacy duplicate fingerprints. The final local backfill updated 742 bills after key derivation and zero on its second run; `pnpm run seed` also passed and repeated the backfill with zero changes.
 - GitHub Actions run `40757061612` succeeded and published `phase11-demo-rc3`. The downloaded APK is 89,895,969 bytes, SHA-256 `d3d525ef5d82118989f5ab3d97d202a8185a120ef282b494d9e600e602481ad7`, passes `apksigner verify`, reports package `org.openrelief.app` version 0.3.0 (code 3), and contains `assets/index.android.bundle` with all four walkthrough screen labels. Its signing certificate fingerprint matches RC2; physical-device installation is untested here.
 
 ## Boundaries and next gates

@@ -126,6 +126,9 @@ test('admin triage is role guarded, paginated, audited and controls feed visibil
     assert.equal(pdfPreview.statusCode, 200, pdfPreview.body);
     assert.match(pdfPreview.headers['content-type'] ?? '', /image\/png/);
     assert.equal((await sharp(pdfPreview.rawPayload).metadata()).format, 'png');
+    await services.s3.send(new PutObjectCommand({ Bucket: config.S3_BUCKET, Key: `admin-test/${rejectId}.jpg`, Body: Buffer.alloc(10 * 1024 * 1024 + 1), ContentType: 'image/jpeg' }));
+    assert.equal((await app.inject({ method: 'GET', url: `/api/admin/reviews/${rejectId}/document`, headers: adminHeaders })).statusCode, 413);
+    assert.equal((await app.inject({ method: 'GET', url: `/api/admin/reviews/${rejectId}/preview`, headers: adminHeaders })).statusCode, 413);
     const missingTerms = await app.inject({ method: 'POST', url: `/api/admin/reviews/${noTermsId}/decision`, headers: adminHeaders, payload: { decision: 'approve', notes: 'attempted approval' } });
     assert.equal(missingTerms.statusCode, 409);
     const approved = await app.inject({ method: 'POST', url: `/api/admin/reviews/${approveId}/decision`, headers: adminHeaders, payload: { decision: 'approve', notes: 'Verified demo creditor and document' } });

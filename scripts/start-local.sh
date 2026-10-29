@@ -8,6 +8,7 @@ source ./.env.local
 set +a
 pnpm --filter @open-relief/db migrate
 pnpm --filter @open-relief/db seed
+pnpm --filter @open-relief/db backfill-fingerprints
 pnpm build
 node apps/api/dist/server.js &
 api_pid=$!

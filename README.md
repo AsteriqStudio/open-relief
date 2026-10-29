@@ -15,7 +15,7 @@ pnpm install --frozen-lockfile --store-dir "$PWD/.pnpm-store"
 bash scripts/start-local.sh
 ```
 
-The startup script creates an ignored `.env.local` with random local credentials if needed, starts PostgreSQL, Redis, and MinIO, applies migrations, seeds seven demo bills across electric, water, gas, medical, and telecom, builds the server packages, and runs the API and OCR worker. It preserves an existing `.env.local`. Stop the foreground script to stop the API and worker; use `docker compose --env-file .env.local down` to stop local services. Data volumes remain until explicitly removed.
+The startup script creates an ignored `.env.local` with random local credentials if needed, starts PostgreSQL, Redis, and MinIO, applies migrations, seeds seven demo bills across electric, water, gas, medical, and telecom, backfills keyed account lookup hashes, builds the server packages, and runs the API and OCR worker. It preserves an existing `.env.local`. Stop the foreground script to stop the API and worker; use `docker compose --env-file .env.local down` to stop local services. Data volumes remain until explicitly removed.
 
 The current standalone Android walkthrough is [RC4](https://github.com/AsteriqStudio/open-relief/releases/tag/phase11-demo-rc4). It contains fictional local flows only; the connected sandbox requires the API above.
 
@@ -58,6 +58,8 @@ EXPO_NO_TELEMETRY=1 EXPO_OFFLINE=1 pnpm --filter @open-relief/mobile exec expo e
 ```
 
 The end-to-end test uploads a JPEG through the presigned form, checks EXIF removal, waits for mock OCR, rejects a duplicate, creates a mock donation, verifies the webhook signature and replay handling, and confirms the bill is settled. Adapter tests exercise signed Stripe test webhook fixtures, partial and full settlement, fee splits, and Method sandbox routing without external credentials. Vetting and admin tests check eligibility, role guards, approval, rejection, audit records, and feed visibility. Tests create uniquely identified demo data on each run.
+
+The API caps stored-document reads at 10 MB even if object storage reports a smaller size. Invalid bill documents receive a recorded rejection reason and audit event instead of retrying OCR. A bill status is visible only to its recipient or an admin. Duplicate OCR jobs cannot write a second review decision. New creditor account lookup hashes use a keyed HMAC; the ingestion path still detects legacy hashes until `pnpm --filter @open-relief/db backfill-fingerprints` has migrated them. Run that command when upgrading an existing local database; both local startup scripts run it automatically.
 
 ## Stripe test checkout and Method simulation
 

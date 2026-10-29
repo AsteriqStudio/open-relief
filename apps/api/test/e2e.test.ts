@@ -87,6 +87,9 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
       if (billStatus !== 'pending_ocr') break;
     }
     assert.equal(billStatus, 'verified');
+    assert.equal((await app.inject({ method: 'GET', url: `/api/bills/${billId}`, headers: donorHeaders })).statusCode, 403);
+    const unrelatedRecipient = await signUp('recipient');
+    assert.equal((await app.inject({ method: 'GET', url: `/api/bills/${billId}`, headers: { authorization: `Bearer ${unrelatedRecipient.token}` } })).statusCode, 404);
     const sanitized = await services.s3.send(new GetObjectCommand({ Bucket: config.S3_BUCKET, Key: `bills/${billId}/sanitized.jpg` }));
     assert.ok(sanitized.Body);
     const metadata = await sharp(await sanitized.Body.transformToByteArray()).metadata();

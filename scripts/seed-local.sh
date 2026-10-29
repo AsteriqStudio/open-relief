@@ -8,3 +8,4 @@ if [[ -f .env.local ]]; then
 fi
 pnpm --filter @open-relief/db migrate
 pnpm --filter @open-relief/db seed
+pnpm --filter @open-relief/db backfill-fingerprints

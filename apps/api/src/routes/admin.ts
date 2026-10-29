@@ -11,6 +11,7 @@ import { isVerifiedDemoMerchantForCategory } from '../biller/methodSandbox.js';
 import { nameSimilarity } from '../services/vettingService.js';
 import type { Services } from '../services.js';
 import { renderPdfFirstPage } from '../pdfPreview.js';
+import { DocumentTooLargeError, readDocumentBytes } from '../documentBytes.js';
 
 const PageSchema = z.object({ page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(50).default(20) }).strict();
 const IdSchema = z.object({ id: z.string().uuid() });
@@ -48,8 +49,10 @@ export function registerAdminRoutes(app: FastifyInstance, services: Services, re
     if (!bill || bill.status !== 'pending_review') return reply.code(404).send({ error: 'Review document not found' });
     const object = await services.s3.send(new GetObjectCommand({ Bucket: services.config.S3_BUCKET, Key: bill.documentKey }));
     if (!object.Body) return reply.code(404).send({ error: 'Review document not found' });
-    const bytes = await object.Body.transformToByteArray();
-    return reply.header('cache-control', 'no-store').type(bill.mimeType).send(Buffer.from(bytes));
+    let bytes: Buffer;
+    try { bytes = await readDocumentBytes(object.Body, object.ContentLength); }
+    catch (error) { if (error instanceof DocumentTooLargeError) return reply.code(413).send({ error: error.message }); throw error; }
+    return reply.header('cache-control', 'no-store').type(bill.mimeType).send(bytes);
   });
 
   app.get('/api/admin/reviews/:id/preview', { preHandler: adminOnly }, async (request, reply) => {
@@ -58,9 +61,9 @@ export function registerAdminRoutes(app: FastifyInstance, services: Services, re
     if (!bill || bill.status !== 'pending_review') return reply.code(404).send({ error: 'Review preview not found' });
     const object = await services.s3.send(new GetObjectCommand({ Bucket: services.config.S3_BUCKET, Key: bill.documentKey }));
     if (!object.Body) return reply.code(404).send({ error: 'Review preview not found' });
-    if (object.ContentLength && object.ContentLength > 10 * 1024 * 1024) return reply.code(413).send({ error: 'Review document exceeds size limit' });
-    const bytes = await object.Body.transformToByteArray();
-    if (bytes.length > 10 * 1024 * 1024) return reply.code(413).send({ error: 'Review document exceeds size limit' });
+    let bytes: Buffer;
+    try { bytes = await readDocumentBytes(object.Body, object.ContentLength); }
+    catch (error) { if (error instanceof DocumentTooLargeError) return reply.code(413).send({ error: error.message }); throw error; }
     if (bill.mimeType === 'application/pdf') {
       let preview: Buffer;
       try { preview = await renderPdfFirstPage(bytes); }

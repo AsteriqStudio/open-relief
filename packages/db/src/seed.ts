@@ -1,8 +1,7 @@
-import { createHash } from 'node:crypto';
 import { and, eq, isNull } from 'drizzle-orm';
 import { PITCH_CARDS } from '@open-relief/shared';
 import { createDatabase, bills, pitchDemoCards, sponsorshipPools, users } from './index.js';
-import { encryptAccountNumber } from './security/encryption.js';
+import { accountLookupHash, billDuplicateFingerprint, encryptAccountNumber } from './security/encryption.js';
 
 const recipientId = '00000000-0000-4000-8000-000000000101';
 const donorId = '00000000-0000-4000-8000-000000000102';
@@ -26,7 +25,7 @@ try {
   await db.update(users).set({ legalName: 'Demo Recipient' }).where(and(eq(users.id, recipientId), isNull(users.legalName)));
 
   for (const sample of samples) {
-    const accountHash = createHash('sha256').update(sample.account).digest('hex');
+    const accountHash = accountLookupHash(sample.account);
     await db.insert(bills).values({
       id: sample.id,
       recipientId,
@@ -37,7 +36,7 @@ try {
       billerMerchantId: sample.merchantId,
       billerAccountEncrypted: encryptAccountNumber(sample.account),
       accountHash,
-      duplicateFingerprint: createHash('sha256').update(`${sample.billerName.toLowerCase()}|${accountHash}|2026-12-15`).digest('hex'),
+      duplicateFingerprint: billDuplicateFingerprint(sample.billerName, sample.account, '2026-12-15'),
       dueDate: '2026-12-15',
       statementBalanceCents: sample.balance,
       remainingBalanceCents: sample.balance,

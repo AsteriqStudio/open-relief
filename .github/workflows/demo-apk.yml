@@ -73,14 +73,14 @@ jobs:
       - name: Publish labeled prerelease
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: phase11-demo-rc5
-          name: Open Relief service-readiness walkthrough RC5
+          tag_name: phase11-demo-rc6
+          name: Open Relief service-readiness walkthrough RC6
           prerelease: true
           make_latest: false
           body: |
             Polished four-tab offline walkthrough with a working recipient-to-review-to-donor path, checkout and activity. Seven fictional bills cover electric, water, gas, medical, and telecom categories. Approved sample cards can be opened in checkout; partial gifts show their remaining balance.
-            The same APK can optionally connect to a user-run OpenRelief sandbox API for accounts, document intake, review, and mock checkout. It verifies the server before opening connected screens. No public server is provided, and a physical phone needs a reachable HTTPS sandbox URL. This build has no Stripe test publishable key, so it accepts mock-payment sandboxes only.
-            Offline mode performs no charge, document upload, OCR, verified creditor decision, disbursement, or charitable tax receipt. Connected mock mode also moves no funds. Built with an embedded JavaScript bundle and demo signing key for Android sideloading. If Android rejects an update because of a signing mismatch, uninstall the prior demo before installing RC5; local demo state will reset.
+            The same APK can optionally connect to a user-run OpenRelief sandbox API for accounts, document intake, review, and mock checkout. It verifies the server before opening connected screens. No public server is provided; native Android connections require HTTPS, and recipient intake also needs reachable document-upload URLs. This build has no Stripe test publishable key, so it accepts mock-payment sandboxes only.
+            Offline mode performs no charge, document upload, OCR, verified creditor decision, disbursement, or charitable tax receipt. Connected mock mode also moves no funds. Built with an embedded JavaScript bundle and demo signing key for Android sideloading. If Android rejects an update because of a signing mismatch, uninstall the prior demo before installing RC6; local demo state will reset.
           files: |
             builds/open-relief-demo.apk
             builds/open-relief-demo.apk.sha256

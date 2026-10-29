@@ -41,6 +41,7 @@ Update this file when a task changes status. Keep implementation claims tied to 
 - [x] RC5 UI and workflow pass: add a verified sandbox entry from the offline APK, keep same-server test sessions, clear saved sessions when switching API URLs, repair approved-sample checkout, and clarify partial-gift receipts.
 - [x] Add a role-guarded recipient bill list so submitted test bills remain visible after leaving intake; validate fields before submission and fix the connected sign-in layout.
 - [x] Refresh the obsidian/emerald hero, creditor cards, brand header, and button interactions; add phone-width preview captures.
+- [x] RC6: require HTTPS for native sandbox connections to match Android release network policy; retain loopback HTTP solely for local web preview.
 
 ## Verification record
 
@@ -59,6 +60,7 @@ Update this file when a task changes status. Keep implementation claims tied to 
 - Authentication throttling: `pnpm run typecheck` passed; `pnpm test` passed all 25 tests with `.env.local` loaded. New API tests verify the sign-in email/IP and IP-only limits, signup IP limit, HTTP 429, and `Retry-After`.
 - Service hardening: `pnpm run typecheck` passed; `pnpm test` passed all 27 tests with `.env.local` loaded. New checks cover cross-account bill access, an oversized admin document, duplicate OCR workers, a bounded stream with incorrect size metadata, invalid-document rejection/audit, keyed lookup hashes, and legacy duplicate fingerprints. The final local backfill updated 742 bills after key derivation and zero on its second run; `pnpm run seed` also passed and repeated the backfill with zero changes.
 - RC5 local verification: `pnpm run typecheck` passed; `pnpm test` passed all 27 tests with `.env.local` loaded; fresh Android and web Expo exports compiled. The API end-to-end test verifies the sandbox capabilities response and recipient-only bill listing. On a 390×844 browser viewport, approved sample → checkout → simulated receipt → Profile activity passed without page errors. Offline → verified sandbox → sign-up → feed → offline → same-server session restore also passed without page errors.
+- RC6 browser verification: remote cleartext HTTP sandbox URL is rejected before any request; local web loopback remains reachable. Native Android requires HTTPS, matching the generated release manifest's default cleartext policy.
 - GitHub Actions run `40757061612` succeeded and published `phase11-demo-rc3`. The downloaded APK is 89,895,969 bytes, SHA-256 `d3d525ef5d82118989f5ab3d97d202a8185a120ef282b494d9e600e602481ad7`, passes `apksigner verify`, reports package `org.openrelief.app` version 0.3.0 (code 3), and contains `assets/index.android.bundle` with all four walkthrough screen labels. Its signing certificate fingerprint matches RC2; physical-device installation is untested here.
 
 ## Boundaries and next gates

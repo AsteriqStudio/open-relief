@@ -17,7 +17,7 @@ bash scripts/start-local.sh
 
 The startup script creates an ignored `.env.local` with random local credentials if needed, starts PostgreSQL, Redis, and MinIO, applies migrations, seeds seven demo bills across electric, water, gas, medical, and telecom, backfills keyed account lookup hashes, builds the server packages, and runs the API and OCR worker. It preserves an existing `.env.local`. Stop the foreground script to stop the API and worker; use `docker compose --env-file .env.local down` to stop local services. Data volumes remain until explicitly removed.
 
-The current Android candidate is [RC5](https://github.com/AsteriqStudio/open-relief/releases/tag/phase11-demo-rc5). Its default four-tab walkthrough runs entirely offline with fictional bills. From Give or Profile, **Connect sandbox** verifies a user-run OpenRelief API before opening account sign-in, recipient intake, review, and mock donor checkout. Reconnecting to the same sandbox restores a valid test session; changing the API address clears stored sessions before sign-in. The app does not include a public server. A physical phone needs a reachable HTTPS test server; `http://10.0.2.2:3000` works only for an Android emulator talking to a local API. This APK has no Stripe test publishable key and therefore accepts mock-payment sandboxes only.
+The current Android candidate is [RC6](https://github.com/AsteriqStudio/open-relief/releases/tag/phase11-demo-rc6). Its default four-tab walkthrough runs entirely offline with fictional bills. From Give or Profile, **Connect sandbox** verifies a user-run OpenRelief API before opening account sign-in, recipient intake, review, and mock donor checkout. Reconnecting to the same sandbox restores a valid test session; changing the API address clears stored sessions before sign-in. The app does not include a public server. The APK requires a reachable HTTPS test server and reachable document-upload URLs for intake. This build has no Stripe test publishable key and therefore accepts mock-payment sandboxes only.
 
 The API listens on `http://127.0.0.1:3000`. A successful `GET /health` returns `{"status":"ok"}`. `GET /api/capabilities` identifies the sandbox and its payment adapter. `GET /api/bills/feed` lists verified demo bills. A signed-in recipient can retrieve their own submissions through `GET /api/bills/mine`; other roles cannot see that list. Create a recipient or donor account in the mobile app to upload bills or simulate donations. Seeded demo users cannot sign in because they have no passwords.
 Connected bill upload now requires an explicit `countryCode: "US"`. Other country codes return HTTP 422 until a country-specific sandbox flow is built. Germany remains an offline EUR concept, and no UK flow is implemented.
@@ -29,7 +29,7 @@ In another terminal, run the Expo app:
 EXPO_NO_TELEMETRY=1 EXPO_OFFLINE=1 pnpm --filter @open-relief/mobile start
 ```
 
-Set `EXPO_PUBLIC_API_URL` to the API address reachable by your simulator or device. Android emulators usually use `http://10.0.2.2:3000`; iOS simulators can use `http://127.0.0.1:3000`. A physical device needs the host machine's LAN address and an API bind address that permits it.
+Set `EXPO_PUBLIC_API_URL` to the API address reachable by your simulator or device. Android emulators can access a local API at `http://10.0.2.2:3000` in a development build that allows cleartext traffic; the published APK only accepts HTTPS. iOS simulators can use `http://127.0.0.1:3000` for local development. A physical device needs a reachable HTTPS API and document store; the repository does not deploy either service.
 
 ## Browser preview
 
@@ -37,7 +37,7 @@ With the API running, use `pnpm preview:web` in a second terminal. The command e
 
 The captured screens below come from the actual app running against the seeded local API. The visual system uses an obsidian canvas, emerald and mint surfaces, readable amount hierarchy, and explicit demo creditor labels across donor and recipient flows:
 
-RC5 phone-width views: [offline Give](docs/previews/rc5-offline-give.png) and [sandbox connection](docs/previews/rc5-sandbox-connect.png). These are browser exports of the Expo UI; native Android rendering should still be checked on a device.
+Phone-width views: [offline Give](docs/previews/rc5-offline-give.png) and [sandbox connection](docs/previews/rc6-sandbox-connect.png). These are browser exports of the Expo UI; native Android rendering should still be checked on a device. The RC6 Android connection screen requires HTTPS.
 
 ![Donor feed preview](docs/previews/donor.png)
 

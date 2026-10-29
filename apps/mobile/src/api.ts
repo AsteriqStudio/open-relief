@@ -22,8 +22,8 @@ export async function getSandboxCapabilities(): Promise<SandboxCapabilities> {
 export function setApiBase(input: string): string {
   const parsed = new URL(input.trim());
   const isLoopback = ['localhost', '127.0.0.1', '10.0.2.2'].includes(parsed.hostname);
-  if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && isLoopback)) {
-    throw new Error('Use an HTTPS sandbox URL. Local emulators may use HTTP loopback.');
+  if (parsed.protocol !== 'https:' && !(Platform.OS === 'web' && parsed.protocol === 'http:' && isLoopback)) {
+    throw new Error('Use an HTTPS sandbox URL. Only the local web preview accepts HTTP loopback.');
   }
   if (parsed.username || parsed.password || parsed.search || parsed.hash) throw new Error('Enter only the sandbox API base URL.');
   apiBase = parsed.href.replace(/\/$/, '');

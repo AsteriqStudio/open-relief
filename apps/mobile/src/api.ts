@@ -3,7 +3,44 @@ import { randomUUID } from 'expo-crypto';
 import { Platform } from 'react-native';
 import { LEGAL_TERMS_VERSION } from '@open-relief/shared';
 
-const API_BASE = process.env.EXPO_PUBLIC_API_URL ?? (Platform.OS === 'web' ? window.location.origin : 'http://127.0.0.1:3000');
+let apiBase = process.env.EXPO_PUBLIC_API_URL ?? (Platform.OS === 'web' ? window.location.origin : 'http://127.0.0.1:3000');
+
+export const SandboxCapabilitiesSchema = z.object({
+  service: z.literal('open-relief'),
+  mode: z.literal('sandbox'),
+  billCountry: z.literal('US'),
+  payments: z.enum(['mock', 'stripe_test']),
+  creditorRail: z.enum(['mock', 'sandbox']),
+}).strict();
+export type SandboxCapabilities = z.infer<typeof SandboxCapabilitiesSchema>;
+
+export function getApiBase(): string { return apiBase; }
+export async function getSandboxCapabilities(): Promise<SandboxCapabilities> {
+  return SandboxCapabilitiesSchema.parse(await request('/api/capabilities', undefined, undefined, 6_000));
+}
+
+export function setApiBase(input: string): string {
+  const parsed = new URL(input.trim());
+  const isLoopback = ['localhost', '127.0.0.1', '10.0.2.2'].includes(parsed.hostname);
+  if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && isLoopback)) {
+    throw new Error('Use an HTTPS sandbox URL. Local emulators may use HTTP loopback.');
+  }
+  if (parsed.username || parsed.password || parsed.search || parsed.hash) throw new Error('Enter only the sandbox API base URL.');
+  apiBase = parsed.href.replace(/\/$/, '');
+  return apiBase;
+}
+
+export async function verifySandboxConnection(input: string): Promise<{ apiUrl: string; capabilities: SandboxCapabilities }> {
+  const previous = apiBase;
+  const apiUrl = setApiBase(input);
+  try {
+    const capabilities = await getSandboxCapabilities();
+    return { apiUrl, capabilities };
+  } catch (error) {
+    apiBase = previous;
+    throw new Error(error instanceof Error ? `Could not verify the sandbox: ${error.message}` : 'Could not verify the sandbox.');
+  }
+}
 const BillSchema = z.object({
   id: z.string().uuid(),
   countryCode: z.string().regex(/^[A-Z]{2}$/),
@@ -41,16 +78,28 @@ const SessionSchema = z.object({ token: z.string().min(1), expiresAt: z.string()
 export type AuthUser = z.infer<typeof AuthUserSchema>;
 export type AuthSession = z.infer<typeof SessionSchema>;
 
-async function request(path: string, init?: RequestInit, token?: string): Promise<unknown> {
+async function request(path: string, init?: RequestInit, token?: string, timeoutMs = 12_000): Promise<unknown> {
   const headers = new Headers(init?.headers);
   if (token) headers.set('Authorization', `Bearer ${token}`);
-  const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
-  const body: unknown = await response.json();
-  if (!response.ok) {
-    const message = z.object({ error: z.string() }).safeParse(body);
-    throw new Error(message.success ? message.data.error : `Request failed (${response.status})`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(`${apiBase}${path}`, { ...init, headers, signal: controller.signal });
+    let body: unknown;
+    try { body = await response.json(); }
+    catch { throw new Error(`Sandbox API returned an invalid response (${response.status}). Check the API URL.`); }
+    if (!response.ok) {
+      const message = z.object({ error: z.string() }).safeParse(body);
+      throw new Error(message.success ? message.data.error : `Request failed (${response.status})`);
+    }
+    return body;
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('The sandbox did not respond in time. Check its URL and connection.');
+    if (error instanceof TypeError) throw new Error('Could not reach the sandbox API. Check that the server is running and reachable from this device.');
+    throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-  return body;
 }
 
 export async function signUp(input: { email: string; password: string; phone: string; role: 'recipient' | 'donor'; legalName?: string; assistanceProgram?: 'SNAP' | 'MEDICAID' | 'LIHEAP' | 'NONE' }): Promise<AuthSession> {
@@ -117,6 +166,16 @@ export async function getBillStatus(id: string, token: string): Promise<z.infer<
   return (await getBillDetails(id, token)).status;
 }
 
+const OwnBillSchema = z.object({
+  id: z.string().uuid(), billerName: z.string().nullable(), category: BillSchema.shape.category,
+  status: BillDetailsSchema.shape.status, statementBalanceCents: z.number().int().nullable(),
+  remainingBalanceCents: z.number().int().nullable(), rejectionReason: z.string().nullable(), createdAt: z.string().datetime(),
+});
+export type OwnBill = z.infer<typeof OwnBillSchema>;
+export async function getOwnBills(token: string): Promise<OwnBill[]> {
+  return z.object({ bills: z.array(OwnBillSchema) }).parse(await request('/api/bills/mine', undefined, token)).bills;
+}
+
 export async function createDonationIntent(input: {
   billId: string;
   amountCents: number;
@@ -176,9 +235,9 @@ export async function decideReview(billId: string, decision: 'approve' | 'reject
 }
 
 export function adminDocumentSource(billId: string, token: string): { uri: string; headers: Record<string, string> } {
-  return { uri: `${API_BASE}/api/admin/reviews/${billId}/document`, headers: { Authorization: `Bearer ${token}` } };
+  return { uri: `${apiBase}/api/admin/reviews/${billId}/document`, headers: { Authorization: `Bearer ${token}` } };
 }
 
 export function adminPreviewSource(billId: string, token: string): { uri: string; headers: Record<string, string> } {
-  return { uri: `${API_BASE}/api/admin/reviews/${billId}/preview`, headers: { Authorization: `Bearer ${token}` } };
+  return { uri: `${apiBase}/api/admin/reviews/${billId}/preview`, headers: { Authorization: `Bearer ${token}` } };
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import type { TextInputProps } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -13,7 +14,7 @@ function FormField({ label, value, onChangeText, ...input }: TextInputProps & { 
   </View>;
 }
 
-export function AuthScreen() {
+export function AuthScreen({ onBackToDemo }: { onBackToDemo?: () => void }) {
   const auth = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [role, setRole] = useState<'recipient' | 'donor'>('donor');
@@ -36,10 +37,11 @@ export function AuthScreen() {
     finally { setBusy(false); }
   }
 
-  return <Modal visible animationType="slide" presentationStyle="fullScreen"><SafeAreaProvider><ScreenBackdrop><SafeAreaView className="flex-1">
+  return <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider><ScreenBackdrop><SafeAreaView className="flex-1">
     <StatusBar style="light" backgroundColor={COLORS.backdrop} />
     <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 44 }} keyboardShouldPersistTaps="handled">
       <BrandHeader mode="sandbox" />
+      {onBackToDemo && <Pressable accessibilityRole="button" onPress={onBackToDemo} className="mt-5 self-start rounded-full border border-line bg-surface px-4 py-3"><Text className="text-xs font-bold text-mint">← Back to offline demo</Text></Pressable>}
       <View className="mt-12"><Text className="text-[11px] font-bold tracking-[2px] text-pine">PURPOSE BUILT FOR RELIEF</Text>
         <Text className="mt-4 text-4xl font-black leading-[45px] tracking-tight text-ink">Direct-to-creditor{"\n"}bill relief.</Text>
         <Text className="mt-4 text-sm leading-6 text-muted">Reviewed utility and essential bills. Sandbox payments are directed to demo creditor accounts, never to recipients.</Text>
@@ -63,5 +65,5 @@ export function AuthScreen() {
       </View>
       <Text className="mt-7 text-center text-[11px] leading-5 text-muted">Sandbox environment · no live financial transactions</Text>
     </ScrollView>
-  </SafeAreaView></ScreenBackdrop></SafeAreaProvider></Modal>;
+  </SafeAreaView></ScreenBackdrop></SafeAreaProvider></GestureHandlerRootView>;
 }

@@ -4,7 +4,7 @@ import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useStripe } from './stripeAdapter';
 import * as Haptics from 'expo-haptics';
 import { BRAND_NOTICE, calculateSponsoredDonationSplit, calculateSponsorMatchCents, donorGiftDisclosure, formatCurrency } from '@open-relief/shared';
-import { completeMockDonation, createDonationIntent } from './api';
+import { completeMockDonation, createDonationIntent, getSandboxCapabilities } from './api';
 import type { DonationIntent, FeedBill } from './api';
 import { useAuth } from './AuthContext';
 import { LegalModal } from './LegalModal';
@@ -86,6 +86,9 @@ export function CheckoutSheet({ bill, onClose, onComplete }: { bill: FeedBill | 
     setError(null);
     let waitingForSheet = false;
     try {
+      if (!process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY?.startsWith('pk_test_') && (await getSandboxCapabilities()).payments === 'stripe_test') {
+        throw new Error('This build cannot present Stripe test payments. Use a mock-payment sandbox or a test-enabled build.');
+      }
       const intent = await createDonationIntent({ billId: bill.id, amountCents, coverProcessingFee, tipPercentage, ...(bill.sponsor ? { sponsorPoolId: bill.sponsor.id } : {}), expectedSponsorMatchCents: split.sponsorMatchCents, donorTermsAccepted: true }, token);
       const confirmation: CheckoutConfirmation = { billId: bill.id, transactionId: intent.transactionId, amountCents, sponsorMatchCents: intent.feeBreakdown.sponsorMatchCents, sponsorName: intent.sponsorName, mode: intent.mode, billerName: bill.billerName ?? 'demo creditor', accountLast4: bill.accountLast4 };
       if (intent.mode === 'mock') {

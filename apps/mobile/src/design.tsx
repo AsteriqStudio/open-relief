@@ -25,10 +25,10 @@ export function ScreenBackdrop({ children }: { children: ReactNode }) {
 export function BrandHeader({ mode, subtitle }: { mode: 'offline' | 'sandbox'; subtitle?: string }) {
   return <View className="flex-row items-center justify-between gap-3">
     <View className="min-w-0 flex-1 flex-row items-center">
-      <View className="h-10 w-10 items-center justify-center rounded-full bg-pine"><Text className="text-base font-black text-canvas">or.</Text></View>
-      <View className="ml-3 min-w-0 flex-1"><Text className="text-base font-black tracking-tight text-ink">OpenRelief</Text>{subtitle && <Text className="text-[10px] font-medium text-muted" numberOfLines={1}>{subtitle}</Text>}</View>
+      <View className="h-11 w-11 items-center justify-center rounded-2xl border border-[#3D855A] bg-[#123E2A]"><Text className="text-lg font-black tracking-tight text-mint">or.</Text></View>
+      <View className="ml-3 min-w-0 flex-1"><Text className="text-base font-black tracking-tight text-ink">OpenRelief<Text className="text-mint">.</Text></Text>{subtitle && <Text className="text-[10px] font-medium text-muted" numberOfLines={1}>{subtitle}</Text>}</View>
     </View>
-    <View className="rounded-full border border-[#24563F] bg-[#0D2A1D] px-3 py-1.5"><Text className="text-[10px] font-bold tracking-wide text-mint">{mode === 'offline' ? 'OFFLINE PITCH DEMO' : 'SANDBOX'}</Text></View>
+    <View className="flex-row items-center rounded-full border border-[#24563F] bg-[#0D2A1D] px-3 py-2"><View className="mr-2 h-1.5 w-1.5 rounded-full bg-mint" /><Text className="text-[9px] font-black tracking-wide text-mint">{mode === 'offline' ? 'OFFLINE DEMO' : 'SANDBOX'}</Text></View>
   </View>;
 }
 
@@ -41,7 +41,7 @@ export function ReceiptRow({ label, value, emphasis = false, badge = false }: { 
 }
 
 export function PrimaryButton({ label, onPress, disabled = false, outline = false }: { label: string; onPress(): void; disabled?: boolean; outline?: boolean }) {
-  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} className={`min-h-14 items-center justify-center rounded-full border px-5 py-3 ${disabled ? 'border-line bg-[#30463A]' : outline ? 'border-pine bg-surface' : 'border-mint bg-mint'}`}>
+  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={({ pressed }) => ({ opacity: pressed ? 0.86 : 1, transform: [{ scale: pressed ? 0.985 : 1 }] })} className={`min-h-14 items-center justify-center rounded-full border px-5 py-3 ${disabled ? 'border-line bg-[#30463A]' : outline ? 'border-pine bg-surface' : 'border-mint bg-mint'}`}>
     <Text className={`text-center text-sm font-black ${disabled ? 'text-muted' : outline ? 'text-mint' : 'text-canvas'}`}>{label}</Text>
   </Pressable>;
 }

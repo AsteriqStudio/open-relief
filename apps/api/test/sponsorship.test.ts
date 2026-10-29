@@ -139,7 +139,7 @@ test('uncovered processing needs a reserved sponsor buffer and expired mock inte
     await services.db.update(transactions).set({ expiresAt: new Date(Date.now() - 1_000) }).where(eq(transactions.id, testIntent.transactionId));
     let canceled = false;
     await reconcileExpiredReservations(services, {
-      async retrieve(id) { assert.equal(id, testIntent.paymentIntentId); return { status: 'requires_payment_method', amountReceivedCents: 0, chargeId: null, metadata: {} }; },
+      async retrieve(id) { return { status: id === testIntent.paymentIntentId ? 'requires_payment_method' : 'processing', amountReceivedCents: 0, chargeId: null, metadata: {} }; },
       async cancel(id) { assert.equal(id, testIntent.paymentIntentId); canceled = true; return true; },
     });
     assert.equal(canceled, true);

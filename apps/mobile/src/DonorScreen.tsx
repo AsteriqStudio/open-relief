@@ -28,7 +28,7 @@ function ImpactCelebration({ confirmation, receipt, onClose }: { confirmation: C
   return <Animated.View style={animatedStyle} className="mt-5 rounded-[28px] border border-line bg-surface p-6">
     <View className="h-16 w-16 items-center justify-center rounded-full bg-pine"><Text className="text-3xl font-black text-canvas">✓</Text></View>
     <Text className="mt-5 text-[11px] font-bold tracking-[2px] text-pine">{confirmation.mode === 'mock' ? 'SIMULATED CONFIRMATION' : 'TEST PAYMENT RECEIVED'}</Text>
-    <Text className="mt-2 text-3xl font-black tracking-tight text-ink">{confirmed ? 'Bill relieved.' : 'Payment received.'}</Text>
+    <Text className="mt-2 text-3xl font-black tracking-tight text-ink">{confirmed ? receipt.remainingBalanceCents === 0 ? 'Bill relieved.' : 'Relief in motion.' : 'Payment received.'}</Text>
     <Text className="mt-3 text-sm leading-6 text-muted">{confirmed ? `${money(receipt.donorPrincipalCents)} demo gift toward ${confirmation.billerName}.` : 'Creditor confirmation is pending the signed test webhook.'}</Text>
     {receipt ? <>
       <View className="mt-6 rounded-2xl border border-[#162920] bg-inset p-4">

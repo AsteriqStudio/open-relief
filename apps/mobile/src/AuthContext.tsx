@@ -5,9 +5,20 @@ import { currentUser, signIn, signOut, signUp } from './api';
 import type { AuthUser } from './api';
 
 const TOKEN_KEY = 'open_relief_session_token';
+const SANDBOX_URL_KEY = 'open_relief_sandbox_url';
 const roles = ['recipient', 'donor', 'admin'] as const;
 type PersonaRole = typeof roles[number];
 const roleTokenKey = (role: PersonaRole) => `open_relief_persona_${role}`;
+export async function clearStoredSessions(): Promise<void> {
+  await Promise.all([SecureStore.deleteItemAsync(TOKEN_KEY), ...roles.map((role) => SecureStore.deleteItemAsync(roleTokenKey(role)))]);
+}
+export async function getRememberedSandboxUrl(): Promise<string | null> {
+  return SecureStore.getItemAsync(SANDBOX_URL_KEY);
+}
+export async function prepareSandboxSession(apiUrl: string): Promise<void> {
+  if (await getRememberedSandboxUrl() !== apiUrl) await clearStoredSessions();
+  await SecureStore.setItemAsync(SANDBOX_URL_KEY, apiUrl);
+}
 type AuthContextValue = {
   loading: boolean;
   user: AuthUser | null;
@@ -62,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async signOut() {
       const savedTokens = await Promise.all(roles.map((role) => SecureStore.getItemAsync(roleTokenKey(role))));
       await Promise.allSettled([...savedTokens, token].filter((value): value is string => value !== null).map((value) => signOut(value)));
-      await Promise.all([SecureStore.deleteItemAsync(TOKEN_KEY), ...roles.map((role) => SecureStore.deleteItemAsync(roleTokenKey(role)))]);
+      await clearStoredSessions();
       setSavedPersonas([]); setToken(null); setUser(null);
     },
     async switchPersona(role) {

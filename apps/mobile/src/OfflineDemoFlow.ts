@@ -29,6 +29,10 @@ export const DemoGiftSchema = z.object({
 }).strict().refine((gift) => gift.creditorCents === gift.donorCents + gift.matchCents && gift.donorTotalCents >= gift.donorCents, 'Illustrative gift totals must reconcile');
 export type DemoGift = z.infer<typeof DemoGiftSchema>;
 
+export function remainingDemoBalance(balances: Record<string, number>, card: PitchCard): number {
+  return balances[card.id] ?? card.balanceCents;
+}
+
 export function reviewDemoSubmission(submissions: DemoSubmission[], id: string, decision: 'approve' | 'reject', note: string): DemoSubmission[] {
   const trimmed = note.trim();
   if (trimmed.length < 5) throw new Error('Enter a review note of at least five characters.');

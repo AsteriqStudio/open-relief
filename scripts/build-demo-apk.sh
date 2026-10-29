@@ -17,6 +17,9 @@ export ANDROID_USER_HOME="${ANDROID_USER_HOME:-$PWD/.local/android-user}"
 mkdir -p "$ANDROID_USER_HOME"
 pnpm --filter @open-relief/shared build
 cd apps/mobile
+bundle_check_dir="$(mktemp -d)"
+trap 'rm -rf "$bundle_check_dir"' EXIT
+pnpm exec expo export --platform android --output-dir "$bundle_check_dir" --clear
 pnpm exec expo prebuild --platform android --clean --no-install
 cd android
 ./gradlew assembleRelease --no-daemon

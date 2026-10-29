@@ -6,11 +6,12 @@ import { LegalModal } from './LegalModal';
 import type { LegalDocument } from './LegalModal';
 import type { DemoGift, DemoSubmission } from './OfflineDemoFlow';
 
-export function OfflineProfileScreen({ gifts, submissions, onReset, onNavigate }: {
+export function OfflineProfileScreen({ gifts, submissions, onReset, onNavigate, onConnectSandbox }: {
   gifts: DemoGift[];
   submissions: DemoSubmission[];
   onReset(): void;
   onNavigate(tab: 'give' | 'need' | 'review'): void;
+  onConnectSandbox(): void;
 }) {
   const [legalDocument, setLegalDocument] = useState<LegalDocument | null>(null);
   const usdCents = gifts.filter((gift) => gift.currency === 'USD').reduce((total, gift) => total + gift.creditorCents, 0);
@@ -31,8 +32,9 @@ export function OfflineProfileScreen({ gifts, submissions, onReset, onNavigate }
     </View>
     <View className="mt-5 rounded-[28px] border border-line bg-surface p-5"><Text className="text-lg font-black text-ink">Explore every role</Text><Text className="mt-2 text-sm leading-5 text-muted">The offline APK includes a donor deck, sample recipient intake, and a fictional review queue.</Text>
       <View className="mt-4 flex-row flex-wrap gap-2">{([['give', 'Give relief'], ['need', 'Need help'], ['review', 'Review queue']] as const).map(([tab, label]) => <Pressable key={tab} accessibilityRole="button" onPress={() => onNavigate(tab)} className="rounded-full border border-pine bg-[#0D2A1D] px-4 py-2"><Text className="text-xs font-bold text-mint">{label} →</Text></Pressable>)}</View>
-      <Text className="mt-4 text-xs leading-5 text-muted">The connected sandbox also has real sign-in, document upload, OCR, admin audit, and Stripe test checkout. Those require its API and are not active in this offline APK.</Text>
+      <Text className="mt-4 text-xs leading-5 text-muted">For account sign-in, document upload, review, and mock checkout, connect this APK to your own running sandbox API.</Text>
     </View>
+    <View className="mt-5 rounded-[28px] border border-[#24563F] bg-[#0D2A1D] p-5"><Text className="text-[11px] font-bold tracking-widest text-mint">FULL WORKFLOW · SANDBOX</Text><Text className="mt-3 text-xl font-black text-ink">Go beyond the pitch.</Text><Text className="mt-2 text-xs leading-5 text-muted">Verify a test server before opening connected screens. No public service or live payment is available.</Text><View className="mt-5"><PrimaryButton label="Connect to sandbox  →" onPress={onConnectSandbox} /></View></View>
     <View className="mt-5 rounded-[28px] border border-line bg-surface p-5"><Text className="text-lg font-black text-ink">Where could this work?</Text>
       <Text className="mt-2 text-sm leading-5 text-muted">Relief can expand country by country when creditor routing, payment partners, compliance, and fee funding are ready. No country has a public service yet.</Text>
       {FEATURED_MARKETS.map((market) => <View key={market.countryCode} className="mt-3 rounded-2xl border border-line bg-inset p-3"><Text className="text-sm font-bold text-ink">{market.name} · {market.countryCode}</Text><Text className="mt-1 text-xs leading-5 text-muted">{market.state === 'connected_sandbox' ? 'Connected US sandbox; simulated creditor settlement only.' : market.state === 'offline_concept' ? 'Fictional EUR screen concept; no connected payment rail.' : 'No country-specific flow is built yet.'}</Text></View>)}

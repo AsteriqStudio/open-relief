@@ -10,7 +10,7 @@ import { COLORS, PrimaryButton } from './design';
 
 const personaRoles = ['recipient', 'donor', 'admin'] as const;
 
-export function ProfileScreen() {
+export function ProfileScreen({ onBackToDemo }: { onBackToDemo?: () => void }) {
   const auth = useAuth();
   const [error, setError] = useState<string | null>(null);
   const [impact, setImpact] = useState<DonorImpact | null>(null);
@@ -66,6 +66,7 @@ export function ProfileScreen() {
     </View>
     {error && <View className="mt-4 rounded-xl border border-[#5C1D1D] bg-[#2B0E0E] p-3"><Text className="text-sm text-coral">{error}</Text></View>}
     <View className="mt-6"><PrimaryButton label="Sign out of all accounts" onPress={() => { void auth.signOut(); }} outline /></View>
+    {onBackToDemo && <Pressable accessibilityRole="button" onPress={onBackToDemo} className="mt-4 min-h-12 items-center justify-center"><Text className="text-sm font-bold text-mint">← Return to offline demo</Text></Pressable>}
     <LegalModal document={legalDocument} onClose={() => setLegalDocument(null)} />
   </ScrollView>;
 }

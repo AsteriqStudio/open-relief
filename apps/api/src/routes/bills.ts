@@ -81,6 +81,15 @@ export function registerBillRoutes(app: FastifyInstance, services: Services, req
     return { id: bill.id, status: bill.status, remainingBalanceCents: bill.remainingBalanceCents, rejectionReason: bill.rejectionReason };
   });
 
+  app.get('/api/bills/mine', { preHandler: requireAuth({ roles: ['recipient'] }) }, async (request) => {
+    const rows = await services.db.select({
+      id: bills.id, billerName: bills.billerName, category: bills.category, status: bills.status,
+      statementBalanceCents: bills.statementBalanceCents, remainingBalanceCents: bills.remainingBalanceCents,
+      rejectionReason: bills.rejectionReason, createdAt: bills.createdAt,
+    }).from(bills).where(eq(bills.recipientId, request.user!.id)).orderBy(desc(bills.createdAt)).limit(50);
+    return { bills: rows.map((bill) => ({ ...bill, createdAt: bill.createdAt.toISOString() })) };
+  });
+
   app.get('/api/bills/feed', async (request) => {
     const query = FeedQuerySchema.parse(request.query);
     const pools = await services.db.select().from(sponsorshipPools).where(eq(sponsorshipPools.active, true)).orderBy(asc(sponsorshipPools.createdAt));

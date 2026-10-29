@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { PITCH_CARDS } from '@open-relief/shared';
-import { approvedDemoCards, DemoGiftSchema, INITIAL_DEMO_SUBMISSIONS, reviewDemoSubmission } from '../src/OfflineDemoFlow.ts';
+import { approvedDemoCards, DemoGiftSchema, INITIAL_DEMO_SUBMISSIONS, remainingDemoBalance, reviewDemoSubmission } from '../src/OfflineDemoFlow.ts';
 
 test('offline deck covers all five categories without changing the connected feed', () => {
   assert.deepEqual(new Set(PITCH_CARDS.map((card) => card.category)), new Set(['electric', 'water', 'gas', 'medical', 'telecom']));
@@ -18,6 +18,8 @@ test('sample review affects only fictional local cards and cannot be replayed', 
   const cards = approvedDemoCards(approved);
   assert.equal(cards.length, 1);
   assert.equal(cards[0]?.id, sample.id);
+  assert.equal(remainingDemoBalance({}, cards[0]!), sample.balanceCents);
+  assert.equal(remainingDemoBalance({ [sample.id]: 0 }, cards[0]!), 0);
   assert.match(cards[0]!.railLabel, /Fictional local submission/);
   assert.throws(() => reviewDemoSubmission(approved, sample.id, 'reject', 'Second decision'));
   const rejected = reviewDemoSubmission(INITIAL_DEMO_SUBMISSIONS, sample.id, 'reject', 'Sample is incomplete');

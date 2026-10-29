@@ -1,12 +1,13 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { LinearGradient } from 'expo-linear-gradient';
 import { calculateSponsoredDonationSplit, calculateSponsorMatchCents, formatCurrency } from '@open-relief/shared';
 import type { PitchCard } from '@open-relief/shared';
 import type { FeedBill } from './api';
 import { SwipeableBillCard } from './SwipeableBillCard';
 import { COLORS, PrimaryButton, ReceiptRow } from './design';
-import { DemoGiftSchema } from './OfflineDemoFlow';
+import { DemoGiftSchema, remainingDemoBalance } from './OfflineDemoFlow';
 import type { DemoGift } from './OfflineDemoFlow';
 
 type DemoReceipt = { card: PitchCard; donorCents: number; matchCents: number; chargeCents: number; toCreditorCents: number; remainingCents: number };
@@ -22,12 +23,14 @@ function asFeedBill(card: PitchCard, remainingCents: number): FeedBill {
   };
 }
 
-export function OfflineDemoScreen({ cards, balances, onBalanceChange, onGift, onReset }: {
+export function OfflineDemoScreen({ cards, balances, focusCardId, onBalanceChange, onGift, onReset, onConnectSandbox }: {
   cards: PitchCard[];
   balances: Record<string, number>;
+  focusCardId: string | null;
   onBalanceChange(id: string, remainingCents: number): void;
   onGift(gift: DemoGift): void;
   onReset(): void;
+  onConnectSandbox(): void;
 }) {
   const sheet = useRef<BottomSheetModal>(null);
   const [index, setIndex] = useState(0);
@@ -39,9 +42,14 @@ export function OfflineDemoScreen({ cards, balances, onBalanceChange, onGift, on
   const [coverProcessingFee, setCoverProcessingFee] = useState(true);
   const [accepted, setAccepted] = useState(false);
   const [receipt, setReceipt] = useState<DemoReceipt | null>(null);
-  const availableCards = cards.filter((item) => (categoryFilter === 'all' || item.category === categoryFilter) && (balances[item.id] ?? item.balanceCents) > 0);
+  useEffect(() => {
+    if (!focusCardId) return;
+    const nextIndex = cards.filter((item) => remainingDemoBalance(balances, item) > 0).findIndex((item) => item.id === focusCardId);
+    if (nextIndex >= 0) { setCategoryFilter('all'); setIndex(nextIndex); setReceipt(null); }
+  }, [cards, focusCardId]);
+  const availableCards = cards.filter((item) => (categoryFilter === 'all' || item.category === categoryFilter) && remainingDemoBalance(balances, item) > 0);
   const card = availableCards.length ? availableCards[index % availableCards.length] : null;
-  const remaining = selected ? balances[selected.id] ?? selected.balanceCents : 0;
+  const remaining = selected ? remainingDemoBalance(balances, selected) : 0;
   const customValid = /^\d{1,6}(?:[.,]\d{1,2})?$/.test(customAmount);
   const customCents = customValid ? Math.round(Number(customAmount.replace(',', '.')) * 100) : 0;
   const donorCents = selected && remaining > 0 ? customAmount ? customCents : Math.max(1, Math.round(remaining * percentage / 100)) : 0;
@@ -52,7 +60,7 @@ export function OfflineDemoScreen({ cards, balances, onBalanceChange, onGift, on
     : null, [selected, donorCents, matchCents, coverProcessingFee, tipPercentage]);
 
   function openCheckout(next: PitchCard) {
-    if ((balances[next.id] ?? 0) <= 0) { setIndex((value) => value + 1); return; }
+    if (remainingDemoBalance(balances, next) <= 0) { setIndex((value) => value + 1); return; }
     setSelected(next);
     setPercentage(next.sponsorName ? 50 : 100);
     setCustomAmount('');
@@ -74,14 +82,18 @@ export function OfflineDemoScreen({ cards, balances, onBalanceChange, onGift, on
 
   return <View className="flex-1">
     <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24, paddingBottom: 42 }}>
-      <Text className="text-[11px] font-bold tracking-[2px] text-pine">DIRECT RELIEF · ZERO CASH OUT</Text>
-      <Text className="mt-3 text-4xl font-black leading-[44px] tracking-tight text-ink">Relief, directly{'\n'}to a creditor.</Text>
-      <Text className="mt-3 text-sm leading-6 text-muted">Explore {cards.length} fictional bills across five categories. Simulated payments only; no card, bank, or network connection is used.</Text>
-      <View className="mt-5 rounded-2xl border border-[#24563F] bg-[#0D2A1D] p-4"><Text className="text-xs font-bold text-mint">Explore the complete walkthrough</Text><Text className="mt-1 text-xs leading-5 text-muted">Use the four tabs below to give, submit a sample bill, review it, and view your demo activity.</Text></View>
+      <LinearGradient colors={['#144532', '#0B2A1F', '#0A1813']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ borderRadius: 28, padding: 23, borderWidth: 1, borderColor: '#346B4E', overflow: 'hidden' }}>
+        <View className="self-start rounded-full border border-[#4D9270] bg-[#1B563C] px-3 py-1.5"><Text className="text-[10px] font-black tracking-widest text-mint">DIRECT RELIEF · ZERO CASH OUT</Text></View>
+        <Text className="mt-5 text-[35px] font-black leading-[40px] tracking-tight text-ink">A bill paid.{`\n`}A weight lifted.</Text>
+        <Text className="mt-4 text-sm leading-6 text-[#C4DCCB]">Explore {cards.length} fictional bills across five categories. Every illustrative gift points to a creditor, never a recipient.</Text>
+        <View className="mt-6 h-px bg-[#3B7555]" />
+        <View className="mt-4 flex-row items-center justify-between"><Text className="text-[11px] font-bold text-mint">BILL  →  REVIEW  →  CREDITOR</Text><Text className="text-lg font-black text-mint">↗</Text></View>
+      </LinearGradient>
+      <View className="mt-4 flex-row flex-wrap items-center justify-between gap-2"><Text className="text-[11px] leading-5 text-muted">Offline · no card or bank connection</Text><Pressable accessibilityRole="button" onPress={onConnectSandbox}><Text className="text-[11px] font-bold text-mint">Connect sandbox  →</Text></Pressable></View>
       {receipt ? <View className="mt-7 rounded-[28px] border border-line bg-surface p-6">
         <View className="h-16 w-16 items-center justify-center rounded-full bg-pine"><Text className="text-3xl font-black text-canvas">✓</Text></View>
         <Text className="mt-6 text-[11px] font-bold tracking-[2px] text-pine">SIMULATED CONFIRMATION</Text>
-        <Text className="mt-2 text-3xl font-black tracking-tight text-ink">Bill relieved.</Text>
+        <Text className="mt-2 text-3xl font-black tracking-tight text-ink">{receipt.remainingCents === 0 ? 'Bill relieved.' : 'Relief in motion.'}</Text>
         <Text className="mt-3 text-sm leading-6 text-muted">{formatCurrency(receipt.donorCents, receipt.card.currency)} demo gift{receipt.matchCents > 0 ? ` plus ${formatCurrency(receipt.matchCents, receipt.card.currency)} fictional match` : ''} toward {receipt.card.billerName}.</Text>
         <View className="mt-6 rounded-2xl border border-[#162920] bg-inset p-4">
           <ReceiptRow label="Your contribution" value={formatCurrency(receipt.donorCents, receipt.card.currency)} />
@@ -95,7 +107,7 @@ export function OfflineDemoScreen({ cards, balances, onBalanceChange, onGift, on
       </View> : <>
         <View className="mt-8 flex-row justify-between"><Text className="text-[11px] font-bold tracking-widest text-ink">FICTIONAL BILL DECK</Text><Text className="text-xs font-bold text-muted">{availableCards.length ? index % availableCards.length + 1 : 0} / {availableCards.length}</Text></View>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-5 mt-4" contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>{categoryFilters.map((filter) => <Pressable key={filter} accessibilityRole="button" accessibilityState={{ selected: categoryFilter === filter }} onPress={() => { setCategoryFilter(filter); setIndex(0); }} className={`min-h-10 items-center justify-center rounded-full border px-4 ${categoryFilter === filter ? 'border-pine bg-[#0D2A1D]' : 'border-line bg-surface'}`}><Text className={`text-xs font-bold capitalize ${categoryFilter === filter ? 'text-mint' : 'text-muted'}`}>{filter === 'all' ? 'All bills' : filter}</Text></Pressable>)}</ScrollView>
-        {card ? <SwipeableBillCard key={`${card.id}-${index}-${selected ? 'open' : 'closed'}`} bill={asFeedBill(card, balances[card.id] ?? card.balanceCents)} onGive={() => openCheckout(card)} onPass={() => setIndex((value) => value + 1)} /> : <View className="mt-5 rounded-[28px] border border-line bg-surface p-6"><Text className="text-xl font-black text-ink">No more bills in this view.</Text><Text className="mt-2 text-sm leading-5 text-muted">Try another category or reset the fictional balances.</Text><View className="mt-5"><PrimaryButton label="Reset demo gifts" onPress={() => { onReset(); setIndex(0); }} outline /></View></View>}
+        {card ? <SwipeableBillCard key={`${card.id}-${index}-${selected ? 'open' : 'closed'}`} bill={asFeedBill(card, remainingDemoBalance(balances, card))} onGive={() => openCheckout(card)} onPass={() => setIndex((value) => value + 1)} /> : <View className="mt-5 rounded-[28px] border border-line bg-surface p-6"><Text className="text-xl font-black text-ink">No more bills in this view.</Text><Text className="mt-2 text-sm leading-5 text-muted">Try another category or reset the fictional balances.</Text><View className="mt-5"><PrimaryButton label="Reset demo gifts" onPress={() => { onReset(); setIndex(0); }} outline /></View></View>}
       </>}
       <Text className="mt-6 text-center text-[11px] leading-5 text-muted">US card-fee estimates are illustrative. EUR cards show a proposed SEPA creditor-reference flow; EU payment rails and pricing are not implemented.</Text>
     </ScrollView>

@@ -3,6 +3,7 @@ import * as Haptics from 'expo-haptics';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { interpolate, runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { formatCurrency } from '@open-relief/shared';
+import { LinearGradient } from 'expo-linear-gradient';
 import type { FeedBill } from './api';
 
 const spring = { damping: 18, stiffness: 180, mass: 0.85 };
@@ -56,12 +57,12 @@ export function SwipeableBillCard({ bill, onGive, onPass }: { bill: FeedBill; on
     <Animated.View style={[relieveStyle, { position: 'absolute', top: 3, right: 3, bottom: 3, left: 3 }]} className="items-end justify-center rounded-[28px] border border-pine bg-[#103524] px-7"><Text className="text-xl font-black tracking-widest text-mint">RELIEVE →</Text></Animated.View>
     <Animated.View style={[passStyle, { position: 'absolute', top: 3, right: 3, bottom: 3, left: 3 }]} className="justify-center rounded-[28px] border border-[#47534B] bg-[#29332D] px-7"><Text className="text-xl font-black tracking-widest text-ink">← PASS</Text></Animated.View>
     <GestureDetector gesture={gesture}><Animated.View style={cardStyle} className="overflow-hidden rounded-[28px] border border-line bg-surface">
-      <View className="px-5 pb-5 pt-5">
-        <View className="flex-row items-start justify-between"><View className="h-12 w-12 items-center justify-center rounded-2xl border border-[#24563F] bg-[#123124]"><Text className="text-lg font-bold text-mint">{icons[bill.category]}</Text></View><View className="rounded-full border border-line bg-inset px-3 py-1.5"><Text className="text-[10px] font-bold uppercase tracking-wide text-muted">{bill.category}</Text></View></View>
+      <LinearGradient colors={['#153D2A', '#0D281D', '#0A1813']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20 }}>
+        <View className="flex-row items-start justify-between"><View className="h-12 w-12 items-center justify-center rounded-2xl border border-[#478260] bg-[#17452F]"><Text className="text-xl font-bold text-mint">{icons[bill.category]}</Text></View><View className="rounded-full border border-[#3C7655] bg-[#163A29] px-3 py-1.5"><Text className="text-[10px] font-bold uppercase tracking-wide text-mint">{bill.category}</Text></View></View>
         <Text className="mt-5 text-xs font-medium text-muted">PAYING DIRECTLY TO</Text>
         <Text className="mt-1 text-2xl font-black tracking-tight text-ink" numberOfLines={2}>{bill.billerName ?? 'Demo creditor'}</Text>
         <View className="mt-3 flex-row flex-wrap items-center gap-2"><View className="rounded-full border border-[#24563F] bg-[#0D2A1D] px-3 py-1.5"><Text className="text-[10px] font-bold text-mint">{bill.railLabel ? '◈  FICTIONAL PITCH CARD' : '✓  REVIEWED DEMO CREDITOR'}</Text></View><Text className="text-xs text-muted">Acct ••••{bill.accountLast4 ?? 'private'}</Text></View>
-      </View>
+      </LinearGradient>
       <View className="h-px bg-line" />
       <View className="px-5 pb-5 pt-4">
         <View className="flex-row items-center justify-between gap-2"><View className={`min-w-0 flex-shrink rounded-full border px-3 py-2 ${immediate ? 'border-[#5C1D1D] bg-[#2B0E0E]' : 'border-[#543B14] bg-cream'}`}><Text className={`text-xs font-bold ${immediate ? 'text-coral' : 'text-amber'}`} numberOfLines={2}>●  {urgency}</Text></View><Text className="flex-shrink text-right text-xs text-muted" numberOfLines={2}>{bill.locationLabel ?? `ZIP ${bill.zipCode ?? 'private'}`}</Text></View>

@@ -37,6 +37,13 @@ export function buildApp(services: Services) {
   });
 
   app.get('/health', async () => ({ status: 'ok' }));
+  app.get('/api/capabilities', async () => ({
+    service: 'open-relief',
+    mode: 'sandbox',
+    billCountry: 'US',
+    payments: services.config.STRIPE_SECRET_KEY ? 'stripe_test' : 'mock',
+    creditorRail: services.config.METHOD_PROVIDER,
+  }));
   registerBillRoutes(app, services, requireAuth);
   registerDonationRoutes(app, services, requireAuth);
   registerAdminRoutes(app, services, requireAuth);

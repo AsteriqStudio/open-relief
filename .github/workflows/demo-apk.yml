@@ -74,6 +74,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: phase11-demo-rc6
+          target_commitish: ${{ github.sha }}
           name: Open Relief service-readiness walkthrough RC6
           prerelease: true
           make_latest: false

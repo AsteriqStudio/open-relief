@@ -17,6 +17,8 @@ bash scripts/start-local.sh
 
 The startup script creates an ignored `.env.local` with random local credentials if needed, starts PostgreSQL, Redis, and MinIO, applies migrations, seeds seven demo bills across electric, water, gas, medical, and telecom, builds the server packages, and runs the API and OCR worker. It preserves an existing `.env.local`. Stop the foreground script to stop the API and worker; use `docker compose --env-file .env.local down` to stop local services. Data volumes remain until explicitly removed.
 
+The current standalone Android walkthrough is [RC4](https://github.com/AsteriqStudio/open-relief/releases/tag/phase11-demo-rc4). It contains fictional local flows only; the connected sandbox requires the API above.
+
 The API listens on `http://127.0.0.1:3000`. A successful `GET /health` returns `{"status":"ok"}`. `GET /api/bills/feed` lists the verified demo bills. Create a recipient or donor account in the mobile app to upload bills or simulate donations. Seeded demo users cannot sign in because they have no passwords.
 Connected bill upload now requires an explicit `countryCode: "US"`. Other country codes return HTTP 422 until a country-specific sandbox flow is built. Germany remains an offline EUR concept, and no UK flow is implemented.
 The bill's country is stored in PostgreSQL; US-only guards also apply at review approval, the donor feed, and checkout.
@@ -73,6 +75,8 @@ When a donor declines processing-fee coverage, the sponsor fee buffer must cover
 
 `POST /api/auth/signup` accepts an email, password of at least 12 characters, phone, and `recipient` or `donor` role. Recipients also provide the legal name on the bill and may self-report an assistance program. `POST /api/auth/signin` returns a signed JWT session token; clients send it as `Authorization: Bearer <token>`. The server stores only a hash of the token's random session ID for revocation and enforces roles and ownership on bill uploads, donations, and receipts. The mobile app stores the token with Expo SecureStore and supports sign out.
 
+Redis atomically limits sign-in to 12 attempts per IP/email pair and 120 per IP in 15 minutes, and sign-up to 100 valid requests per IP in 15 minutes. Excess attempts return HTTP 429 with `Retry-After`. Redis keys use keyed hashes instead of raw IPs or emails. These thresholds protect the sandbox's password hashing and need review alongside trusted proxy configuration before a public deployment.
+
 The OCR worker defaults to `OCR_PROVIDER=mock`. Set `OCR_PROVIDER=textract` and `AWS_REGION` when AWS credentials are available through the standard SDK credential chain. The Textract adapter calls `AnalyzeDocument` with account number, amount, due date, biller name, and account holder queries; it also reads notice text from detected lines. Its extracted bill remains pending manual review until a creditor routing ID is independently verified; extraction alone never authorizes payment.
 
 ## Eligibility and donor experience
@@ -93,6 +97,6 @@ The admin API lists pending reviews with pagination, serves review previews and 
 
 - Stripe test mode can present PaymentSheet with test cards, but no real funds move. The Method adapter is a local sandbox simulation and cannot disburse money.
 - The mock OCR adapter recognizes only a demo electric biller. Uploads in other categories stay in manual review until a category-matched demo creditor is independently verified; seeded medical and telecom bills demonstrate the donor flow. Textract extraction can produce a bill for manual review, but it cannot approve a live creditor or route money.
-- Authentication uses local password accounts and revocable database sessions. Names and assistance programs are self-reported, so the match is a review signal rather than proof of identity. Household linking, email verification, password recovery, abuse throttling, stronger admin enrollment, full document viewing in the mobile app, and delivered decision notifications are still required before public deployment. The API remains bound to loopback.
+- Authentication uses local password accounts and revocable database sessions. Names and assistance programs are self-reported, so the match is a review signal rather than proof of identity. Household linking, email verification, password recovery, wider abuse controls, stronger admin enrollment, full document viewing in the mobile app, and delivered decision notifications are still required before public deployment. The API remains bound to loopback.
 - Payment confirmations make no tax-deductibility claim. Direct bill payments are not automatically charitable contributions, and the project has no verified 501(c)(3) status. The generated email payload is a payment confirmation, not a charitable tax receipt.
 - A future live design needs verified creditor routing, payment-provider coordination, authentication, privacy and fraud controls, and legal review. A Stripe charge followed by a separate disbursement does not alone establish that the platform avoids custody or money-transmission obligations.

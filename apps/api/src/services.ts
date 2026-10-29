@@ -5,6 +5,8 @@ import { createDatabase } from '@open-relief/db';
 import type { ApiConfig } from './config.js';
 import type { ITestPaymentReconciler } from './payments.js';
 import { createStripeTestReconciler } from './stripeTest.js';
+import { RedisAuthAttemptLimiter } from './authThrottle.js';
+import type { AuthAttemptLimiter } from './authThrottle.js';
 
 export const BILL_QUEUE_NAME = 'bill-ocr';
 export type Database = ReturnType<typeof createDatabase>['db'];
@@ -14,6 +16,7 @@ export interface Services {
   s3: S3Client;
   queue: Queue;
   config: ApiConfig;
+  authAttempts: AuthAttemptLimiter;
   testPayments?: ITestPaymentReconciler;
   close(): Promise<void>;
 }
@@ -37,7 +40,7 @@ export async function createServices(config: ApiConfig): Promise<Services> {
       await s3.send(new CreateBucketCommand({ Bucket: config.S3_BUCKET }));
     }
     return {
-      db, s3, queue, config,
+      db, s3, queue, config, authAttempts: new RedisAuthAttemptLimiter(redis, config.AUTH_JWT_SECRET),
       ...(config.STRIPE_SECRET_KEY ? { testPayments: createStripeTestReconciler(config.STRIPE_SECRET_KEY) } : {}),
       async close() {
         await Promise.all([queue.close(), redis.quit(), pool.end()]);

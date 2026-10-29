@@ -13,7 +13,7 @@ declare module 'fastify' {
 
 export function buildApp(services: Services) {
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
-  const requireAuth = registerAuth(app, services.db, services.config.AUTH_JWT_SECRET);
+  const requireAuth = registerAuth(app, services.db, services.config.AUTH_JWT_SECRET, services.authAttempts);
   app.removeContentTypeParser('application/json');
   app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (request, body, done) => {
     try {

@@ -6,6 +6,7 @@ import { z } from 'zod';
 import { authSessions, users } from '@open-relief/db';
 import { AssistanceProgramSchema } from '@open-relief/shared';
 import type { Database } from './services.js';
+import type { AuthAttemptLimiter } from './authThrottle.js';
 
 const SESSION_DAYS = 7;
 const PasswordSchema = z.string().min(12).max(128);
@@ -76,7 +77,7 @@ async function issueSession(db: Database, user: AuthUser, signingKey: Uint8Array
   return { token, expiresAt: expiresAt.toISOString(), user };
 }
 
-export function registerAuth(app: FastifyInstance, db: Database, secretHex: string) {
+export function registerAuth(app: FastifyInstance, db: Database, secretHex: string, authAttempts: AuthAttemptLimiter) {
   const signingKey = Buffer.from(secretHex, 'hex');
   const requireAuth = (options: { roles?: AuthRole[] } = {}) => async (request: FastifyRequest, reply: FastifyReply) => {
     const match = TOKEN_PATTERN.exec(request.headers.authorization ?? '');
@@ -102,6 +103,8 @@ export function registerAuth(app: FastifyInstance, db: Database, secretHex: stri
 
   app.post('/api/auth/signup', async (request, reply) => {
     const input = SignUpSchema.parse(request.body);
+    const attempt = await authAttempts.takeSignupAttempt(request.ip);
+    if (!attempt.allowed) return reply.header('Retry-After', String(attempt.retryAfterSeconds)).code(429).send({ error: 'Too many sign-up attempts. Please try again later.' });
     const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.email, input.email));
     if (existing) return reply.code(409).send({ error: 'Email already registered' });
     const user: AuthUser = { id: randomUUID(), role: input.role, email: input.email };
@@ -116,6 +119,8 @@ export function registerAuth(app: FastifyInstance, db: Database, secretHex: stri
 
   app.post('/api/auth/signin', async (request, reply) => {
     const input = SignInSchema.parse(request.body);
+    const attempt = await authAttempts.takeSignInAttempt(request.ip, input.email);
+    if (!attempt.allowed) return reply.header('Retry-After', String(attempt.retryAfterSeconds)).code(429).send({ error: 'Too many sign-in attempts. Please try again later.' });
     const [user] = await db.select().from(users).where(eq(users.email, input.email));
     if (!user?.passwordHash || !await verifyPassword(input.password, user.passwordHash)) {
       return reply.code(401).send({ error: 'Invalid credentials' });

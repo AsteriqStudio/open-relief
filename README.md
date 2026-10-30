@@ -4,6 +4,7 @@ A local, zero-cash **demo** for direct-to-creditor mutual aid. Recipients submit
 
 See [PROGRESS.md](PROGRESS.md) for the current implementation, verification results, and remaining approval gates.
 See [the service launch plan](docs/pilot-operating-plan.md) for fee funding, commercial revenue, market expansion, and pilot go/no-go evidence.
+See [public launch readiness](docs/public-launch-readiness.md) for the specific evidence still missing before real recipients or donors can use the service.
 
 ## Run locally
 
@@ -17,9 +18,9 @@ bash scripts/start-local.sh
 
 The startup script creates an ignored `.env.local` with random local credentials if needed, starts PostgreSQL, Redis, and MinIO, applies migrations, seeds seven demo bills across electric, water, gas, medical, and telecom, backfills keyed account lookup hashes, builds the server packages, and runs the API and OCR worker. It preserves an existing `.env.local`. Stop the foreground script to stop the API and worker; use `docker compose --env-file .env.local down` to stop local services. Data volumes remain until explicitly removed.
 
-The current Android release is [RC6](https://github.com/AsteriqStudio/open-relief/releases/tag/phase11-demo-rc6). Its default four-tab walkthrough runs entirely offline with fictional bills. From Give or Profile, **Connect sandbox** verifies a user-run OpenRelief API before opening account sign-in, recipient intake, review, and mock donor checkout. Reconnecting to the same sandbox restores a valid test session; changing the API address clears stored sessions before sign-in. The app does not include a public server. The APK requires a reachable HTTPS test server and reachable document-upload URLs for intake. This build has no Stripe test publishable key and therefore accepts mock-payment sandboxes only.
+The Android prerelease is [RC7](https://github.com/AsteriqStudio/open-relief/releases/tag/phase11-demo-rc7). Its default four-tab walkthrough runs entirely offline with fictional bills. From Give or Profile, **Connect sandbox** verifies a user-run OpenRelief API before opening account sign-in, recipient intake, review, and mock donor checkout. Reconnecting to the same sandbox restores a valid test session; changing the API address clears stored sessions before sign-in. The app does not include a public server. Connected intake needs a reachable HTTPS test API; documents travel through its authenticated upload endpoint. This build has no Stripe test publishable key and therefore accepts mock-payment sandboxes only.
 
-The API listens on `http://127.0.0.1:3000`. A successful `GET /health` returns `{"status":"ok"}`. `GET /api/capabilities` identifies the sandbox and its payment adapter. `GET /api/bills/feed` lists verified demo bills. A signed-in recipient can retrieve their own submissions through `GET /api/bills/mine`; other roles cannot see that list. Create a recipient or donor account in the mobile app to upload bills or simulate donations. Seeded demo users cannot sign in because they have no passwords.
+The API listens on `http://127.0.0.1:3000`. A successful `GET /health` returns `{"status":"ok"}`; `GET /ready` checks PostgreSQL, Redis, object storage, and OCR worker presence. `GET /api/capabilities` identifies the sandbox and its payment adapter. `GET /api/bills/feed` lists verified demo bills. A signed-in recipient can retrieve their own submissions through `GET /api/bills/mine`; other roles cannot see that list. Create a recipient or donor account in the mobile app to upload bills or simulate donations. Seeded demo users cannot sign in because they have no passwords.
 Connected bill upload now requires an explicit `countryCode: "US"`. Other country codes return HTTP 422 until a country-specific sandbox flow is built. Germany remains an offline EUR concept, and no UK flow is implemented.
 The bill's country is stored in PostgreSQL; US-only guards also apply at review approval, the donor feed, and checkout.
 
@@ -29,7 +30,7 @@ In another terminal, run the Expo app:
 EXPO_NO_TELEMETRY=1 EXPO_OFFLINE=1 pnpm --filter @open-relief/mobile start
 ```
 
-Set `EXPO_PUBLIC_API_URL` to the API address reachable by your simulator or device. Android emulators can access a local API at `http://10.0.2.2:3000` in a development build that allows cleartext traffic; the published APK only accepts HTTPS. iOS simulators can use `http://127.0.0.1:3000` for local development. A physical device needs a reachable HTTPS API and document store; the repository does not deploy either service.
+Set `EXPO_PUBLIC_API_URL` to the API address reachable by your simulator or device. Android emulators can access a local API at `http://10.0.2.2:3000` in a development build that allows cleartext traffic; the published APK only accepts HTTPS. iOS simulators can use `http://127.0.0.1:3000` for local development. A physical device needs a reachable HTTPS API; the repository does not deploy one.
 
 ## Browser preview
 
@@ -59,7 +60,7 @@ EXPO_NO_TELEMETRY=1 EXPO_OFFLINE=1 pnpm --filter @open-relief/mobile export
 EXPO_NO_TELEMETRY=1 EXPO_OFFLINE=1 pnpm --filter @open-relief/mobile exec expo export --platform web
 ```
 
-The end-to-end test uploads a JPEG through the presigned form, checks EXIF removal, waits for mock OCR, rejects a duplicate, creates a mock donation, verifies the webhook signature and replay handling, and confirms the bill is settled. Adapter tests exercise signed Stripe test webhook fixtures, partial and full settlement, fee splits, and Method sandbox routing without external credentials. Vetting and admin tests check eligibility, role guards, approval, rejection, audit records, and feed visibility. Tests create uniquely identified demo data on each run.
+The end-to-end test uploads a JPEG through the authenticated API, checks EXIF removal, waits for mock OCR, rejects a duplicate, creates a mock donation, verifies the webhook signature and replay handling, and confirms the bill is settled. It also checks legacy presigned upload compatibility, upload role and MIME guards, and readiness failure when the OCR worker is absent. Adapter tests exercise signed Stripe test webhook fixtures, partial and full settlement, fee splits, and Method sandbox routing without external credentials. Vetting and admin tests check eligibility, role guards, approval, rejection, audit records, and feed visibility. Tests create uniquely identified demo data on each run.
 
 The API caps stored-document reads at 10 MB even if object storage reports a smaller size. Invalid bill documents receive a recorded rejection reason and audit event instead of retrying OCR. A bill status is visible only to its recipient or an admin. Duplicate OCR jobs cannot write a second review decision. New creditor account lookup hashes use a keyed HMAC; the ingestion path still detects legacy hashes until `pnpm --filter @open-relief/db backfill-fingerprints` has migrated them. Run that command when upgrading an existing local database; both local startup scripts run it automatically.
 

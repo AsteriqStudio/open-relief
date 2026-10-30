@@ -1,4 +1,6 @@
 import Fastify from 'fastify';
+import { HeadBucketCommand } from '@aws-sdk/client-s3';
+import { sql } from 'drizzle-orm';
 import { ZodError } from 'zod';
 import { registerAuth } from './auth.js';
 import { registerAdminRoutes } from './routes/admin.js';
@@ -24,6 +26,9 @@ export function buildApp(services: Services) {
       done(Object.assign(new Error('Invalid JSON'), { statusCode: 400 }), undefined);
     }
   });
+  app.addContentTypeParser('application/octet-stream', { parseAs: 'buffer' }, (_request, body, done) => {
+    done(null, body);
+  });
   app.setErrorHandler((error, _request, reply) => {
     if (error instanceof ZodError) {
       reply.code(400).send({ error: 'Invalid request', details: error.flatten() });
@@ -37,10 +42,24 @@ export function buildApp(services: Services) {
   });
 
   app.get('/health', async () => ({ status: 'ok' }));
+  app.get('/ready', async (_request, reply) => {
+    try {
+      await Promise.all([
+        services.db.execute(sql`SELECT 1`),
+        (async () => (await services.queue.client).get('open-relief:readiness'))(),
+        services.s3.send(new HeadBucketCommand({ Bucket: services.config.S3_BUCKET })),
+      ]);
+      if ((await services.queue.getWorkers()).length === 0) throw new Error('OCR worker unavailable');
+      return { status: 'ready' };
+    } catch {
+      return reply.code(503).send({ status: 'unavailable' });
+    }
+  });
   app.get('/api/capabilities', async () => ({
     service: 'open-relief',
     mode: 'sandbox',
     billCountry: 'US',
+    documentUpload: 'api_proxy',
     payments: services.config.STRIPE_SECRET_KEY ? 'stripe_test' : 'mock',
     creditorRail: services.config.METHOD_PROVIDER,
   }));

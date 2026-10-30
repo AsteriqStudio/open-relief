@@ -8,7 +8,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "start": "node dist/server.js",
     "worker": "node dist/worker.js",
-    "bootstrap-admin": "tsx src/bootstrapAdmin.ts",
+    "bootstrap-admin": "pnpm build && node dist/bootstrapAdmin.js",
     "test": "pnpm build && node --experimental-strip-types --test test/*.test.ts"
   },
   "dependencies": {

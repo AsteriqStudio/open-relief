@@ -26,9 +26,18 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
   try {
     await app.ready();
     await worker.waitUntilReady();
+    const readiness = await app.inject({ method: 'GET', url: '/ready' });
+    assert.equal(readiness.statusCode, 200);
+    assert.deepEqual(readiness.json(), { status: 'ready' });
+    const getWorkers = services.queue.getWorkers.bind(services.queue);
+    services.queue.getWorkers = async () => [];
+    const unavailable = await app.inject({ method: 'GET', url: '/ready' });
+    services.queue.getWorkers = getWorkers;
+    assert.equal(unavailable.statusCode, 503);
+    assert.deepEqual(unavailable.json(), { status: 'unavailable' });
     const capabilities = await app.inject({ method: 'GET', url: '/api/capabilities' });
     assert.equal(capabilities.statusCode, 200);
-    assert.deepEqual(capabilities.json(), { service: 'open-relief', mode: 'sandbox', billCountry: 'US', payments: 'mock', creditorRail: 'mock' });
+    assert.deepEqual(capabilities.json(), { service: 'open-relief', mode: 'sandbox', billCountry: 'US', documentUpload: 'api_proxy', payments: 'mock', creditorRail: 'mock' });
     const signUp = async (role: 'recipient' | 'donor') => {
       const email = `${role}-${randomUUID()}@example.invalid`;
       const response = await app.inject({ method: 'POST', url: '/api/auth/signup', payload: { email, password: 'local test password 2026', phone: '+15555550123', role, ...(role === 'recipient' ? { legalName: 'Demo Recipient' } : {}) } });
@@ -37,6 +46,7 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     };
     const recipient = await signUp('recipient');
     const donor = await signUp('donor');
+    const unrelatedRecipient = await signUp('recipient');
     assert.equal(recipient.token.split('.').length, 3);
     const recipientHeaders = { authorization: `Bearer ${recipient.token}` };
     const donorHeaders = { authorization: `Bearer ${donor.token}` };
@@ -62,22 +72,35 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     assert.equal(signIn.json<{ user: { id: string } }>().user.id, donor.user.id);
     const color = randomBytes(3);
     const image = await sharp({ create: { width: 3, height: 3, channels: 3, background: { r: color[0]!, g: color[1]!, b: color[2]! } } }).jpeg().withExif({ IFD0: { Copyright: 'metadata to strip' } }).toBuffer();
-    const submit = async () => {
+    const submit = async (viaProxy = false) => {
       const response = await app.inject({ method: 'POST', url: '/api/bills/upload-url', headers: recipientHeaders, payload: {
         countryCode: 'US', category: 'electric', mimeType: 'image/jpeg', sizeBytes: image.length, zipCode: '48201', story: 'Demo family facing an overdue power bill', declaredBillerName: 'Demo Utility', attestation: { accepted: true, termsVersion: 'v1.0' },
       } });
       assert.equal(response.statusCode, 201, response.body);
       const details = response.json<{ billId: string; url: string; fields: Record<string, string> }>();
-      const form = new FormData();
-      for (const [key, value] of Object.entries(details.fields)) form.set(key, value);
-      form.set('file', new Blob([image], { type: 'image/jpeg' }), 'bill.jpg');
-      const upload = await fetch(details.url, { method: 'POST', body: form });
-      assert.ok(upload.ok, `S3 upload failed: ${upload.status} ${await upload.text()}`);
+      if (viaProxy) {
+        const uploadUrl = `/api/bills/${details.billId}/document`;
+        const uploadHeaders = { ...recipientHeaders, 'content-type': 'application/octet-stream' };
+        assert.equal((await app.inject({ method: 'PUT', url: uploadUrl, headers: { 'content-type': 'application/octet-stream' }, payload: image })).statusCode, 401);
+        assert.equal((await app.inject({ method: 'PUT', url: uploadUrl, headers: { ...donorHeaders, 'content-type': 'application/octet-stream' }, payload: image })).statusCode, 403);
+        assert.equal((await app.inject({ method: 'PUT', url: uploadUrl, headers: { authorization: `Bearer ${unrelatedRecipient.token}`, 'content-type': 'application/octet-stream' }, payload: image })).statusCode, 403);
+        assert.equal((await app.inject({ method: 'PUT', url: uploadUrl, headers: uploadHeaders, payload: Buffer.alloc(image.length) })).statusCode, 400);
+        assert.equal((await app.inject({ method: 'PUT', url: uploadUrl, headers: uploadHeaders, payload: Buffer.alloc(10 * 1024 * 1024 + 1) })).statusCode, 413);
+        const upload = await app.inject({ method: 'PUT', url: uploadUrl, headers: uploadHeaders, payload: image });
+        assert.equal(upload.statusCode, 200, upload.body);
+        assert.deepEqual(upload.json(), { billId: details.billId, uploaded: true });
+      } else {
+        const form = new FormData();
+        for (const [key, value] of Object.entries(details.fields)) form.set(key, value);
+        form.set('file', new Blob([image], { type: 'image/jpeg' }), 'bill.jpg');
+        const upload = await fetch(details.url, { method: 'POST', body: form });
+        assert.ok(upload.ok, `S3 upload failed: ${upload.status} ${await upload.text()}`);
+      }
       const complete = await app.inject({ method: 'POST', url: `/api/bills/${details.billId}/complete`, headers: recipientHeaders });
       assert.equal(complete.statusCode, 202, complete.body);
       return details.billId;
     };
-    const billId = await submit();
+    const billId = await submit(true);
     const ownBills = await app.inject({ method: 'GET', url: '/api/bills/mine', headers: recipientHeaders });
     assert.equal(ownBills.statusCode, 200);
     assert.ok(ownBills.json<{ bills: Array<{ id: string }> }>().bills.some((bill) => bill.id === billId));
@@ -95,7 +118,6 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
     }
     assert.equal(billStatus, 'verified');
     assert.equal((await app.inject({ method: 'GET', url: `/api/bills/${billId}`, headers: donorHeaders })).statusCode, 403);
-    const unrelatedRecipient = await signUp('recipient');
     assert.equal((await app.inject({ method: 'GET', url: `/api/bills/${billId}`, headers: { authorization: `Bearer ${unrelatedRecipient.token}` } })).statusCode, 404);
     assert.ok(!(await app.inject({ method: 'GET', url: '/api/bills/mine', headers: { authorization: `Bearer ${unrelatedRecipient.token}` } })).json<{ bills: Array<{ id: string }> }>().bills.some((bill) => bill.id === billId));
     const sanitized = await services.s3.send(new GetObjectCommand({ Bucket: config.S3_BUCKET, Key: `bills/${billId}/sanitized.jpg` }));

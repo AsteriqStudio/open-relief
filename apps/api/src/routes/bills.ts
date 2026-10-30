@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { HeadObjectCommand } from '@aws-sdk/client-s3';
+import { HeadObjectCommand, PutObjectCommand } from '@aws-sdk/client-s3';
 import { createPresignedPost } from '@aws-sdk/s3-presigned-post';
+import { fileTypeFromBuffer } from 'file-type';
 import { and, asc, desc, eq, inArray } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -55,6 +56,20 @@ export function registerBillRoutes(app: FastifyInstance, services: Services, req
       termsVersion: LEGAL_TERMS_VERSION,
     });
     return reply.code(201).send({ billId, url: post.url, fields: post.fields, expiresInSeconds: 300 });
+  });
+
+  app.put('/api/bills/:id/document', { onRequest: requireAuth({ roles: ['recipient'] }), bodyLimit: MAX_BYTES }, async (request, reply) => {
+    const { id } = BillIdSchema.parse(request.params);
+    const [bill] = await services.db.select({ recipientId: bills.recipientId, status: bills.status, documentKey: bills.documentKey, documentMimeType: bills.documentMimeType, documentSizeBytes: bills.documentSizeBytes, termsAcceptedAt: bills.termsAcceptedAt }).from(bills).where(eq(bills.id, id));
+    if (!bill) return reply.code(404).send({ error: 'Bill not found' });
+    if (bill.recipientId !== request.user!.id) return reply.code(403).send({ error: 'Bill belongs to another recipient' });
+    if (bill.status !== 'pending_ocr' || !bill.termsAcceptedAt) return reply.code(409).send({ error: 'Bill is not awaiting a document' });
+    const body = request.body;
+    if (!Buffer.isBuffer(body) || body.length === 0 || body.length !== bill.documentSizeBytes) return reply.code(400).send({ error: 'Document size does not match the declared file' });
+    const detected = await fileTypeFromBuffer(body);
+    if (detected?.mime !== bill.documentMimeType) return reply.code(400).send({ error: 'Document type does not match the declared file' });
+    await services.s3.send(new PutObjectCommand({ Bucket: services.config.S3_BUCKET, Key: bill.documentKey, Body: body, ContentType: bill.documentMimeType }));
+    return { billId: id, uploaded: true };
   });
 
   app.post('/api/bills/:id/complete', { preHandler: requireAuth({ roles: ['recipient'] }) }, async (request, reply) => {

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import { adminPreviewSource, decideReview, getPendingReviews } from './api';
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { adminPreviewSource, decideReview, getAdminPreviewObjectUrl, getPendingReviews } from './api';
 import type { AdminReview } from './api';
 import { useAuth } from './AuthContext';
 import { COLORS, PrimaryButton } from './design';
@@ -14,6 +14,17 @@ function ReviewCard({ review, token, onDecided }: { review: AdminReview; token: 
   const [error, setError] = useState<string | null>(null);
   const [previewLoaded, setPreviewLoaded] = useState(false);
   const [previewFailed, setPreviewFailed] = useState(false);
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
+  useEffect(() => {
+    if (Platform.OS !== 'web') return;
+    let active = true;
+    let objectUrl: string | null = null;
+    void getAdminPreviewObjectUrl(review.billId, token).then((url) => {
+      if (active) { objectUrl = url; setPreviewUri(url); }
+      else URL.revokeObjectURL(url);
+    }).catch(() => { if (active) setPreviewFailed(true); });
+    return () => { active = false; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [review.billId, token]);
   async function decide(decision: 'approve' | 'reject') {
     if (busy) return;
     if (decision === 'approve' && !previewLoaded) { setError('Review the document preview before approval.'); return; }
@@ -29,7 +40,7 @@ function ReviewCard({ review, token, onDecided }: { review: AdminReview; token: 
     <View className="flex-row items-center justify-between gap-2"><Text className="text-[11px] font-black tracking-widest text-amber">MANUAL REVIEW</Text><View className="rounded-full border border-[#543B14] bg-cream px-3 py-1"><Text className="text-[10px] font-bold text-amber">PENDING</Text></View></View>
     <Text className="mt-4 text-xl font-black text-ink">{review.billerName ?? 'Unidentified creditor'}</Text>
     <Text className="mt-1 text-sm text-muted">{review.recipientEmail} · {dollars(review.statementBalanceCents)}</Text>
-    <View className="mt-5 overflow-hidden rounded-2xl border border-line bg-inset"><Image source={adminPreviewSource(review.billId, token)} resizeMode="contain" style={{ width: '100%', height: 220 }} onLoad={() => { setPreviewLoaded(true); setPreviewFailed(false); }} onError={() => { setPreviewLoaded(false); setPreviewFailed(true); }} /></View>
+    <View className="mt-5 overflow-hidden rounded-2xl border border-line bg-inset">{Platform.OS === 'web' && !previewUri ? <View className="h-[220px] items-center justify-center">{!previewFailed && <ActivityIndicator color={COLORS.emerald} />}</View> : <Image source={Platform.OS === 'web' ? { uri: previewUri! } : adminPreviewSource(review.billId, token)} resizeMode="contain" style={{ width: '100%', height: 220 }} onLoad={() => { setPreviewLoaded(true); setPreviewFailed(false); }} onError={() => { setPreviewLoaded(false); setPreviewFailed(true); }} />}</View>
     <Text className="mt-2 text-xs leading-5 text-muted">{review.documentMimeType === 'application/pdf' ? 'First page of PDF' : 'Uploaded bill image'} · Full document available through the admin document API.</Text>
     {previewFailed && <Text className="mt-2 text-sm text-coral">Preview unavailable. Approval is disabled until the document can be inspected.</Text>}
     <View className="mt-4 rounded-2xl border border-[#162920] bg-inset p-4"><Text className="text-[11px] font-bold tracking-widest text-muted">NAME COMPARISON</Text><Text className="mt-3 text-sm text-ink">Recipient: {review.recipientLegalName ?? 'Missing'}</Text><Text className="mt-1 text-sm text-ink">Bill account holder: {review.accountHolderName ?? 'Missing'}</Text><View className={`mt-3 self-start rounded-full border px-3 py-1.5 ${nameMatchLow ? 'border-[#5C1D1D] bg-[#2B0E0E]' : 'border-[#24563F] bg-[#0D2A1D]'}`}><Text className={`text-xs font-bold ${nameMatchLow ? 'text-coral' : 'text-mint'}`}>{review.nameMatchPercentage === null ? 'Match unavailable' : `${review.nameMatchPercentage}% name match`}</Text></View></View>

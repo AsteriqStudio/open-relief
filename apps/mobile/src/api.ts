@@ -9,6 +9,7 @@ export const SandboxCapabilitiesSchema = z.object({
   service: z.literal('open-relief'),
   mode: z.literal('sandbox'),
   billCountry: z.literal('US'),
+  documentUpload: z.literal('api_proxy'),
   payments: z.enum(['mock', 'stripe_test']),
   creditorRail: z.enum(['mock', 'sandbox']),
 }).strict();
@@ -148,11 +149,10 @@ export async function uploadBill(input: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ countryCode: 'US', category: input.category, zipCode: input.zipCode, story: input.story, mimeType: input.mimeType, sizeBytes: file.size, declaredBillerName: input.declaredBillerName, attestation: { accepted: input.attestationAccepted, termsVersion: LEGAL_TERMS_VERSION } }),
   }, token));
-  const form = new FormData();
-  for (const [key, value] of Object.entries(details.fields)) form.append(key, value);
-  form.append('file', file, input.name);
-  const upload = await fetch(details.url, { method: 'POST', body: form });
-  if (!upload.ok) throw new Error(`Document upload failed (${upload.status})`);
+  const uploaded = z.object({ billId: z.string().uuid(), uploaded: z.literal(true) }).parse(await request(`/api/bills/${details.billId}/document`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/octet-stream' }, body: file,
+  }, token, 60_000));
+  if (uploaded.billId !== details.billId) throw new Error('Document upload confirmation did not match the bill.');
   await request(`/api/bills/${details.billId}/complete`, { method: 'POST' }, token);
   return details.billId;
 }
@@ -240,4 +240,14 @@ export function adminDocumentSource(billId: string, token: string): { uri: strin
 
 export function adminPreviewSource(billId: string, token: string): { uri: string; headers: Record<string, string> } {
   return { uri: `${apiBase}/api/admin/reviews/${billId}/preview`, headers: { Authorization: `Bearer ${token}` } };
+}
+
+export async function getAdminPreviewObjectUrl(billId: string, token: string): Promise<string> {
+  if (Platform.OS !== 'web') throw new Error('Browser preview URLs are available only on web.');
+  const source = adminPreviewSource(billId, token);
+  const response = await fetch(source.uri, { headers: source.headers, cache: 'no-store' });
+  if (!response.ok) throw new Error(`Could not load document preview (${response.status}).`);
+  const blob = await response.blob();
+  if (!blob.type.startsWith('image/')) throw new Error('Document preview is not an image.');
+  return URL.createObjectURL(blob);
 }

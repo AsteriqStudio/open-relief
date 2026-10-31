@@ -26,6 +26,13 @@ test('upload through mock OCR to direct demo creditor settlement', async () => {
   try {
     await app.ready();
     await worker.waitUntilReady();
+    const allowedOrigin = config.CORS_ALLOWED_ORIGINS[0]!;
+    const preflight = await app.inject({ method: 'OPTIONS', url: '/api/bills/feed', headers: { origin: allowedOrigin, 'access-control-request-method': 'GET' } });
+    assert.equal(preflight.statusCode, 204);
+    assert.equal(preflight.headers['access-control-allow-origin'], allowedOrigin);
+    const rejectedOrigin = await app.inject({ method: 'GET', url: '/api/bills/feed', headers: { origin: 'https://untrusted.example' } });
+    assert.equal(rejectedOrigin.statusCode, 403);
+    assert.equal(rejectedOrigin.headers['x-content-type-options'], 'nosniff');
     const readiness = await app.inject({ method: 'GET', url: '/ready' });
     assert.equal(readiness.statusCode, 200);
     assert.deepEqual(readiness.json(), { status: 'ready' });

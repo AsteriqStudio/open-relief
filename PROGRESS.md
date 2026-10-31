@@ -44,6 +44,7 @@ Update this file when a task changes status. Keep implementation claims tied to 
 - [x] RC6: require HTTPS for native sandbox connections to match Android release network policy; retain loopback HTTP solely for local web preview.
 - [x] RC7: route authenticated recipient document uploads through the API, repair browser admin previews and the local admin bootstrap command, and add dependency and worker readiness checks.
 - [x] Document public launch evidence and the blocked live-service decision without enabling real charges or payouts.
+- [x] Add a private-sandbox container, HTTPS proxy template, CORS/origin controls, health checks, deployment runbook, partner brief, and container-build CI gate. The package keeps OCR and payment adapters in mock mode.
 
 ## Verification record
 
@@ -76,6 +77,7 @@ Update this file when a task changes status. Keep implementation claims tied to 
 - The demo has no executed agent-of-the-payee agreement and makes no money-transmitter exemption claim. Legal copy remains a draft for qualified review.
 - Public deployment still needs independently verified creditor routing, payment-provider and legal arrangements, stronger authentication and fraud controls, delivered notifications, and a successful cloud environment publication.
 - The RC7 launch assessment is in `docs/public-launch-readiness.md`. Public intake and live donations remain blocked; the APK and test API are only for fictional demos or a private, nonfinancial sandbox.
+- Private sandbox deployment is documented in `docs/private-sandbox-deployment.md`. Local Docker Compose configuration validates, and GitHub Actions now verifies the image build because this workspace's Docker build cannot reach the npm registry.
 - The Phase 11 APK is an offline fictional payment simulation. No Android device or emulator was attached here, so on-device launch and gesture checks remain to be done by a human tester. The local workspace could not download React Native AARs through its proxy; the GitHub Actions native build succeeded. The APK uses a demo debug signing certificate and is not a Play Store release.
 - RC2 uses Android version code 2 and a new prerelease tag. Its APK signing certificate fingerprint matches RC1 in this build, so Android should allow an in-place update; installation on a physical device remains untested here.
 - RC4 is a verified downloadable prerelease APK, not a public financial service or Play Store build. No Android device or emulator was attached for an on-device install test. Local native APK assembly remains blocked by HTTP 403 while Gradle downloads React Native Android AARs; the GitHub-built APK and checksum were verified directly from the release URL.

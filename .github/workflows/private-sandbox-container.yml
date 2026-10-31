@@ -1,0 +1,34 @@
+name: Verify private sandbox container
+
+on:
+  push:
+    branches: [feature/sandbox-mvp]
+    paths:
+      - '.github/workflows/private-sandbox-container.yml'
+      - 'apps/api/**'
+      - 'packages/db/**'
+      - 'packages/shared/**'
+      - 'apps/api/Dockerfile'
+      - 'docker-compose.sandbox.yml'
+      - 'pnpm-lock.yaml'
+  pull_request:
+    paths:
+      - '.github/workflows/private-sandbox-container.yml'
+      - 'apps/api/**'
+      - 'packages/db/**'
+      - 'packages/shared/**'
+      - 'apps/api/Dockerfile'
+      - 'docker-compose.sandbox.yml'
+      - 'pnpm-lock.yaml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build private sandbox API image
+        run: docker build --target build -f apps/api/Dockerfile -t open-relief-api-sandbox-check .

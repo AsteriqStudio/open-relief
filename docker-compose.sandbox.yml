@@ -1,0 +1,44 @@
+services:
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file: ${OPEN_RELIEF_SANDBOX_ENV_FILE:-./deploy/private-sandbox.env}
+    command: ["node", "packages/db/dist/migrate.js"]
+    profiles: ["ops"]
+    restart: "no"
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file: ${OPEN_RELIEF_SANDBOX_ENV_FILE:-./deploy/private-sandbox.env}
+    environment:
+      API_BIND_HOST: 0.0.0.0
+      RUNTIME_MODE: private_sandbox
+    command: ["node", "apps/api/dist/server.js"]
+    ports:
+      - "127.0.0.1:3000:3000"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/ready').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file: ${OPEN_RELIEF_SANDBOX_ENV_FILE:-./deploy/private-sandbox.env}
+    environment:
+      RUNTIME_MODE: private_sandbox
+    command: ["node", "apps/api/dist/worker.js"]
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp

@@ -16,6 +16,24 @@ declare module 'fastify' {
 export function buildApp(services: Services) {
   const app = Fastify({ logger: false, bodyLimit: 1024 * 1024 });
   const requireAuth = registerAuth(app, services.db, services.config.AUTH_JWT_SECRET, services.authAttempts);
+  app.addHook('onRequest', async (request, reply) => {
+    reply.header('Content-Security-Policy', "default-src 'none'; base-uri 'none'; frame-ancestors 'none'");
+    reply.header('Referrer-Policy', 'no-referrer');
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('X-Frame-Options', 'DENY');
+    reply.header('Permissions-Policy', 'camera=(), geolocation=(), microphone=()');
+    const origin = request.headers.origin;
+    if (!origin) return;
+    if (!services.config.CORS_ALLOWED_ORIGINS.includes(origin)) {
+      return reply.code(403).send({ error: 'Origin is not allowed' });
+    }
+    reply.header('Vary', 'Origin');
+    reply.header('Access-Control-Allow-Origin', origin);
+    reply.header('Access-Control-Allow-Headers', 'Authorization, Content-Type, Stripe-Signature');
+    reply.header('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS');
+    reply.header('Access-Control-Max-Age', '600');
+    if (request.method === 'OPTIONS') return reply.code(204).send();
+  });
   app.removeContentTypeParser('application/json');
   app.addContentTypeParser('application/json', { parseAs: 'buffer' }, (request, body, done) => {
     try {

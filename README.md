@@ -5,6 +5,7 @@ A local, zero-cash **demo** for direct-to-creditor mutual aid. Recipients submit
 See [PROGRESS.md](PROGRESS.md) for the current implementation, verification results, and remaining approval gates.
 See [the service launch plan](docs/pilot-operating-plan.md) for fee funding, commercial revenue, market expansion, and pilot go/no-go evidence.
 See [public launch readiness](docs/public-launch-readiness.md) for the specific evidence still missing before real recipients or donors can use the service.
+See [the private sandbox deployment runbook](docs/private-sandbox-deployment.md) and [pilot partner brief](docs/pilot-partner-brief.md) for the safe next stage.
 
 ## Run locally
 

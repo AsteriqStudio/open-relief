@@ -15,8 +15,8 @@ process.once('SIGINT', () => { void shutdown(); });
 process.once('SIGTERM', () => { void shutdown(); });
 
 try {
-  await app.listen({ host: '127.0.0.1', port: config.PORT });
-  console.log(`API listening on port ${config.PORT}`);
+  await app.listen({ host: config.API_BIND_HOST, port: config.PORT });
+  console.log(`API listening on ${config.API_BIND_HOST}:${config.PORT} (${config.RUNTIME_MODE})`);
 } catch (error) {
   await shutdown();
   throw error;

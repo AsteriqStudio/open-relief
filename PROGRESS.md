@@ -45,6 +45,7 @@ Update this file when a task changes status. Keep implementation claims tied to 
 - [x] RC7: route authenticated recipient document uploads through the API, repair browser admin previews and the local admin bootstrap command, and add dependency and worker readiness checks.
 - [x] Document public launch evidence and the blocked live-service decision without enabling real charges or payouts.
 - [x] Add a private-sandbox container, HTTPS proxy template, CORS/origin controls, health checks, deployment runbook, partner brief, and container-build CI gate. The package keeps OCR and payment adapters in mock mode.
+- [x] Add a first-pilot partner discovery shortlist for payment rails, creditor/referral operators, and sponsor fee funding. It makes no affiliation or pricing claim and requires written provider confirmation before a live pilot.
 
 ## Verification record
 

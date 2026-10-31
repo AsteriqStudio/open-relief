@@ -6,6 +6,8 @@ Open Relief is a polished Android walkthrough and private sandbox for the propos
 
 The current build does not charge cards, disburse funds, validate a real creditor account, or issue a tax receipt. It is suitable for product demonstrations and synthetic-data workflow testing only.
 
+The [partner discovery shortlist](partner-discovery-shortlist.md) names payment, operator, and sponsor categories to qualify before a real pilot. It does not imply that any organization is affiliated with Open Relief.
+
 ## What we need from a first-pilot partner
 
 We are looking for one narrow pilot: one market, one or two bill categories, a limited creditor set, and an accountable operator. A sponsor or institutional partner should be able to describe its intended campaign budget, matching policy, fee funding, commercial service arrangement, reporting needs, and dispute owner.

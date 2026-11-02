@@ -1,6 +1,6 @@
 # Mobile color system
 
-Open Relief now uses a restrained navy and blue palette instead of treating green as the product identity. Financial and relief products need calm hierarchy more than a decorative “good news” color.
+Open Relief uses a professional light interface: white cards, soft-gray working surfaces, dark ink text, and a restrained blue action family. The palette avoids treating green as the product identity.
 
 ## Research principles used
 
@@ -13,15 +13,15 @@ Open Relief now uses a restrained navy and blue palette instead of treating gree
 
 | Role | Color | Use |
 | --- | --- | --- |
-| Canvas | `#0C1220` | Page background and dark text on pale calls to action |
-| Surface | `#151F31` | Cards and bottom navigation |
-| Inset | `#101827` | Inputs and nested areas |
-| Ink | `#F8FAFC` | Primary text |
-| Muted | `#AAB7CA` | Supporting text |
-| Action | `#4F7FE7` | Selected controls, focus, and progress |
-| Action light | `#B8CCFF` | Calls to action and action text on dark surfaces |
-| Success | `#67D6A4` | Settlement or review success, never generic navigation |
-| Warning | `#F2C36B` | Review and time-sensitive notices |
-| Error | `#FB8B9A` | Rejection and errors |
+| Canvas | `#F7F9FC` | Page background |
+| Surface | `#FFFFFF` | Cards and bottom navigation |
+| Inset | `#F1F5F9` | Inputs and nested areas |
+| Ink | `#172033` | Primary text |
+| Muted | `#64748B` | Supporting text |
+| Action | `#185ADB` | Selected controls, focus, and progress |
+| Action text | `#1F4FB5` | Links and primary calls to action |
+| Success | `#15803D` | Settlement or review success, never generic navigation |
+| Warning | `#9A4E0A` | Review and time-sensitive notices |
+| Error | `#BE123C` | Rejection and errors |
 
 The redesigned palette is applied through NativeWind tokens and the shared mobile design components, so donor, recipient, reviewer, authentication, and profile screens use the same hierarchy.

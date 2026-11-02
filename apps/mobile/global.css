@@ -4,8 +4,8 @@
 
 @layer base {
   html, body, #root {
-    background: #0C1220;
-    color: #F8FAFC;
+    background: #F7F9FC;
+    color: #172033;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   }
 }

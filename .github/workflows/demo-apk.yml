@@ -73,15 +73,15 @@ jobs:
       - name: Publish labeled prerelease
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: phase11-demo-rc8
+          tag_name: phase11-demo-rc9
           target_commitish: ${{ github.sha }}
-          name: Open Relief navy and blue walkthrough RC8
+          name: Open Relief professional light walkthrough RC9
           prerelease: true
           make_latest: false
           body: |
-            A calmer navy and blue visual system replaces the broad emerald treatment: neutral slate surfaces, readable hierarchy, blue action controls, and green reserved for completed states. The four-tab offline walkthrough includes a working recipient-to-review-to-donor path, checkout, and activity. Seven fictional bills cover electric, water, gas, medical, and telecom categories. Approved sample cards can be opened in checkout; partial gifts show their remaining balance.
+            A professional light visual system uses white cards, soft-gray working surfaces, dark ink typography, and restrained blue actions. Green is reserved for completed states. The four-tab offline walkthrough includes a working recipient-to-review-to-donor path, checkout, and activity. Seven fictional bills cover electric, water, gas, medical, and telecom categories. Approved sample cards can be opened in checkout; partial gifts show their remaining balance.
             The same APK can optionally connect to a user-run OpenRelief sandbox API for accounts, document intake, review, and mock checkout. It verifies the server before opening connected screens. Native Android connections require HTTPS; documents upload through the authenticated API. No public server is provided. This build has no Stripe test publishable key and accepts mock-payment sandboxes only.
-            Offline mode performs no charge, document upload, OCR, verified creditor decision, disbursement, or charitable tax receipt. Connected mock mode also moves no funds. Built with an embedded JavaScript bundle and demo signing key for Android sideloading. See docs/public-launch-readiness.md for the evidence required before real bills or payments. If Android rejects an update because of a signing mismatch, uninstall the prior demo before installing RC8; local demo state will reset.
+            Offline mode performs no charge, document upload, OCR, verified creditor decision, disbursement, or charitable tax receipt. Connected mock mode also moves no funds. Built with an embedded JavaScript bundle and demo signing key for Android sideloading. See docs/public-launch-readiness.md for the evidence required before real bills or payments. If Android rejects an update because of a signing mismatch, uninstall the prior demo before installing RC9; local demo state will reset.
           files: |
             builds/open-relief-demo.apk
             builds/open-relief-demo.apk.sha256

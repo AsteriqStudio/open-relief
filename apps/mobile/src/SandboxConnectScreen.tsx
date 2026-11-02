@@ -35,11 +35,11 @@ export function SandboxConnectScreen({ onConnected, onBack }: { onConnected(apiU
     <Text className="mt-9 text-[11px] font-bold tracking-[2px] text-pine">CONNECTED SANDBOX</Text>
     <Text className="mt-3 text-4xl font-black leading-[44px] tracking-tight text-ink">Take the full{`\n`}workflow for a spin.</Text>
     <Text className="mt-4 text-sm leading-6 text-muted">Sign in, submit a test bill, review it, and simulate direct creditor aid using your own running OpenRelief API. This is a test environment, not a public relief service.</Text>
-    <View className="mt-8 rounded-[28px] border border-[#365E9E] bg-surface p-5">
+    <View className="mt-8 rounded-[28px] border border-[#C9D8F1] bg-surface p-5">
       <Text className="text-[11px] font-bold tracking-widest text-mint">01  SANDBOX API ADDRESS</Text>
       <Text className="mt-3 text-xs leading-5 text-muted">This Android APK needs a reachable HTTPS test server. The local browser preview can use HTTP loopback. Bill documents are sent through the authenticated API.</Text>
-      <TextInput accessibilityLabel="Sandbox API URL" value={url} onChangeText={setUrl} autoCapitalize="none" autoCorrect={false} keyboardType="url" placeholder="https://sandbox.example.com" placeholderTextColor="#7888A1" selectionColor={COLORS.emerald} className="mt-5 min-h-14 rounded-2xl border border-line bg-inset px-4 text-sm text-ink" />
-      {error && <View className="mt-4 rounded-xl border border-[#60283A] bg-[#2B1520] p-3"><Text className="text-xs leading-5 text-coral">{error}</Text></View>}
+      <TextInput accessibilityLabel="Sandbox API URL" value={url} onChangeText={setUrl} autoCapitalize="none" autoCorrect={false} keyboardType="url" placeholder="https://sandbox.example.com" placeholderTextColor="#64748B" selectionColor={COLORS.emerald} className="mt-5 min-h-14 rounded-2xl border border-line bg-inset px-4 text-sm text-ink" />
+      {error && <View className="mt-4 rounded-xl border border-[#F8D8DF] bg-[#FFF0F3] p-3"><Text className="text-xs leading-5 text-coral">{error}</Text></View>}
       <View className="mt-5"><PrimaryButton label={busy ? 'Verifying test server…' : 'Verify & connect  →'} disabled={busy || !url.trim()} onPress={() => void connect()} /></View>
       {busy && <ActivityIndicator className="mt-4" color={COLORS.emerald} />}
     </View>

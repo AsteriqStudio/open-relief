@@ -31,7 +31,7 @@ function ImpactCelebration({ confirmation, receipt, onClose }: { confirmation: C
     <Text className="mt-2 text-3xl font-black tracking-tight text-ink">{confirmed ? receipt.remainingBalanceCents === 0 ? 'Bill relieved.' : 'Relief in motion.' : 'Payment received.'}</Text>
     <Text className="mt-3 text-sm leading-6 text-muted">{confirmed ? `${money(receipt.donorPrincipalCents)} demo gift toward ${confirmation.billerName}.` : 'Creditor confirmation is pending the signed test webhook.'}</Text>
     {receipt ? <>
-      <View className="mt-6 rounded-2xl border border-[#202C40] bg-inset p-4">
+      <View className="mt-6 rounded-2xl border border-[#E2E8F0] bg-inset p-4">
         <Text className="mb-2 text-[11px] font-bold tracking-widest text-pine">PAYMENT BREAKDOWN</Text>
         <ReceiptRow label="Your contribution" value={money(receipt.donorPrincipalCents)} />
         {receipt.sponsorMatchCents > 0 && <ReceiptRow label={`${receipt.sponsorName ?? 'Sponsor'} match`} value={`+${money(receipt.sponsorMatchCents)}`} />}
@@ -92,11 +92,11 @@ export function DonorScreen() {
     {confirmation ? <ImpactCelebration confirmation={confirmation} receipt={receipt} onClose={() => setConfirmation(null)} /> : <>
       <View className="mt-8 flex-row items-center justify-between"><Text className="text-[11px] font-bold tracking-widest text-ink">BILLS NEEDING HELP</Text><Text className="text-xs font-semibold text-muted">{loading ? 'Loading' : `${bills.length === 0 ? 0 : Math.min(index + 1, bills.length)} / ${bills.length}`}</Text></View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-5 mt-4" contentContainerStyle={{ paddingHorizontal: 20, gap: 8 }}>
-        {categoryFilters.map((option) => <Pressable key={option} accessibilityRole="button" accessibilityState={{ selected: categoryFilter === option }} onPress={() => { setCategoryFilter(option); setIndex(0); }} className={`min-h-10 items-center justify-center rounded-full border px-4 ${categoryFilter === option ? 'border-pine bg-[#13284B]' : 'border-line bg-surface'}`}><Text className={`text-xs font-bold ${categoryFilter === option ? 'text-mint' : 'text-muted'}`}>{categoryLabels[option]}</Text></Pressable>)}
+        {categoryFilters.map((option) => <Pressable key={option} accessibilityRole="button" accessibilityState={{ selected: categoryFilter === option }} onPress={() => { setCategoryFilter(option); setIndex(0); }} className={`min-h-10 items-center justify-center rounded-full border px-4 ${categoryFilter === option ? 'border-pine bg-[#F0F5FF]' : 'border-line bg-surface'}`}><Text className={`text-xs font-bold ${categoryFilter === option ? 'text-mint' : 'text-muted'}`}>{categoryLabels[option]}</Text></Pressable>)}
       </ScrollView>
       {loading ? <View className="mt-5 rounded-[28px] border border-line bg-surface p-10"><ActivityIndicator color={COLORS.emerald} /></View> : current ? <SwipeableBillCard key={`${current.id}-${selectedBill ? 'open' : 'closed'}`} bill={current} onGive={() => setSelectedBill(current)} onPass={() => setIndex((value) => value + 1)} /> : <View className="mt-5 rounded-[28px] border border-line bg-surface p-6"><Text className="text-2xl font-black text-ink">{bills.length === 0 ? 'No bills in this category.' : 'You are all caught up.'}</Text><Text className="mt-2 text-sm leading-6 text-muted">Try another category or refresh the reviewed demo feed.</Text><View className="mt-6"><PrimaryButton label="Refresh feed" onPress={() => void refresh()} outline /></View></View>}
     </>}
-    {error && <View className="mt-4 rounded-xl border border-[#60283A] bg-[#2B1520] p-3"><Text className="text-sm text-coral">{error}</Text></View>}
+    {error && <View className="mt-4 rounded-xl border border-[#F8D8DF] bg-[#FFF0F3] p-3"><Text className="text-sm text-coral">{error}</Text></View>}
   </ScrollView>
     <CheckoutSheet bill={selectedBill} onClose={() => { setSelectedBill(null); void refresh(); }} onComplete={handleComplete} />
   </View>;

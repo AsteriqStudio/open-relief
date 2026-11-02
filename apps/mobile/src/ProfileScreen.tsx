@@ -31,15 +31,15 @@ export function ProfileScreen({ onBackToDemo }: { onBackToDemo?: () => void }) {
     <Text className="text-[11px] font-bold tracking-[2px] text-pine">YOUR ACCOUNT</Text>
     <Text className="mt-3 text-4xl font-black tracking-tight text-ink">Profile & impact.</Text>
     <Text className="mt-2 text-sm leading-6 text-muted">Your account, your activity, and the terms behind the demo.</Text>
-    <View className="mt-7 rounded-[28px] border border-[#365E9E] bg-[#13284B] p-6">
+    <View className="mt-7 rounded-[28px] border border-[#C9D8F1] bg-[#F0F5FF] p-6">
       <Text className="text-[11px] font-bold tracking-widest text-mint">SIGNED IN AS</Text>
       <Text className="mt-3 text-lg font-black text-ink" numberOfLines={2}>{auth.user?.email ?? 'Unknown account'}</Text>
-      <View className="mt-5 self-start rounded-full border border-[#42689F] bg-[#1B3560] px-3 py-2"><Text className="text-xs font-bold capitalize text-mint">{auth.user?.role} · sandbox account</Text></View>
+      <View className="mt-5 self-start rounded-full border border-[#B4C8E8] bg-[#E6F0FF] px-3 py-2"><Text className="text-xs font-bold capitalize text-mint">{auth.user?.role} · sandbox account</Text></View>
     </View>
     {auth.user?.role === 'donor' && <View className="mt-5 rounded-[28px] border border-line bg-surface p-5">
       <View className="flex-row items-center justify-between"><Text className="text-lg font-black text-ink">Your demo impact</Text>{impactLoading && <ActivityIndicator color={COLORS.emerald} />}</View>
       <Text className="mt-1 text-xs leading-5 text-muted">From your completed sandbox transactions.</Text>
-      <View className="mt-5 flex-row rounded-2xl border border-[#202C40] bg-inset py-5">
+      <View className="mt-5 flex-row rounded-2xl border border-[#E2E8F0] bg-inset py-5">
         {([
           { label: 'Creditor aid', value: impact ? formatCurrency(impact.creditorAidCents, 'USD') : '—' },
           { label: 'Bills settled', value: impact ? String(impact.settledBills) : '—' },
@@ -59,12 +59,12 @@ export function ProfileScreen({ onBackToDemo }: { onBackToDemo?: () => void }) {
       <View className="mt-4"><PrimaryButton label="Add another account" onPress={() => { void auth.addPersona(); }} outline /></View>
     </View>}
     <View className="mt-5 rounded-[28px] border border-line bg-surface p-5">
-      <Text className="text-lg font-black text-ink">Trust & disclosures</Text>
-      <Text className="mt-2 text-sm leading-5 text-muted">How sandbox gifts, creditor accounts, refunds, and personal information are handled.</Text>
+      <Text className="text-lg font-black text-ink">Data, access & disclosures</Text>
+      <Text className="mt-2 text-sm leading-5 text-muted">No behavioural analytics run in this app. Connected sandbox accounts use an encrypted device session; the privacy notice explains what the server stores.</Text>
       <View className="mt-5"><PrimaryButton label="Payment & legal details  →" onPress={() => setLegalDocument('payment')} outline /></View>
       <View className="mt-5 flex-row gap-6"><Pressable accessibilityRole="button" onPress={() => setLegalDocument('terms')}><Text className="text-sm font-bold text-mint">Terms of service</Text></Pressable><Pressable accessibilityRole="button" onPress={() => setLegalDocument('privacy')}><Text className="text-sm font-bold text-mint">Privacy notice</Text></Pressable></View>
     </View>
-    {error && <View className="mt-4 rounded-xl border border-[#60283A] bg-[#2B1520] p-3"><Text className="text-sm text-coral">{error}</Text></View>}
+    {error && <View className="mt-4 rounded-xl border border-[#F8D8DF] bg-[#FFF0F3] p-3"><Text className="text-sm text-coral">{error}</Text></View>}
     <View className="mt-6"><PrimaryButton label="Sign out of all accounts" onPress={() => { void auth.signOut(); }} outline /></View>
     {onBackToDemo && <Pressable accessibilityRole="button" onPress={onBackToDemo} className="mt-4 min-h-12 items-center justify-center"><Text className="text-sm font-bold text-mint">← Return to offline demo</Text></Pressable>}
     <LegalModal document={legalDocument} onClose={() => setLegalDocument(null)} />

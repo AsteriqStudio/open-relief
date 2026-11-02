@@ -28,7 +28,7 @@ function SignedInApp({ onBackToDemo }: { onBackToDemo?: () => void }) {
   const mainLabel = auth.user.role === 'recipient' ? 'Need Help' : auth.user.role === 'donor' ? 'Give Help' : 'Admin Review';
   return <GestureHandlerRootView style={{ flex: 1 }}>
     <SafeAreaProvider><BottomSheetModalProvider><ScreenBackdrop><SafeAreaView className="flex-1">
-      <StatusBar style="light" backgroundColor={COLORS.backdrop} />
+      <StatusBar style="dark" backgroundColor={COLORS.backdrop} />
       <View className="border-b border-line px-5 py-3"><BrandHeader mode="sandbox" subtitle={`${auth.user.role} account · direct creditor aid`} /></View>
       {tab === 'profile' ? <ProfileScreen {...(onBackToDemo ? { onBackToDemo } : {})} /> : auth.user.role === 'recipient' ? <RecipientScreen /> : auth.user.role === 'donor' ? <DonorScreen /> : <AdminReviewScreen />}
       <View className="flex-row border-t border-line bg-surface px-3 pb-1 pt-2">
@@ -49,7 +49,7 @@ export default function App() {
   }, [mode]);
   function returnToDemo() { setMode('offline'); }
   if (mode === 'starting') return <View className="flex-1 items-center justify-center bg-canvas"><ActivityIndicator color={COLORS.emerald} /></View>;
-  if (mode !== 'connected') return <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider><BottomSheetModalProvider><ScreenBackdrop><SafeAreaView className="flex-1"><StatusBar style="light" backgroundColor={COLORS.backdrop} />
+  if (mode !== 'connected') return <GestureHandlerRootView style={{ flex: 1 }}><SafeAreaProvider><BottomSheetModalProvider><ScreenBackdrop><SafeAreaView className="flex-1"><StatusBar style="dark" backgroundColor={COLORS.backdrop} />
     {mode === 'offline' ? <OfflineDemoApp onConnectSandbox={() => setMode('connect')} /> : <SandboxConnectScreen onBack={() => setMode('offline')} onConnected={async (apiUrl) => { await prepareSandboxSession(apiUrl); setMode('connected'); }} />}
   </SafeAreaView></ScreenBackdrop></BottomSheetModalProvider></SafeAreaProvider></GestureHandlerRootView>;
   const content = <AuthProvider><SignedInApp onBackToDemo={returnToDemo} /></AuthProvider>;

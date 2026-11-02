@@ -10,7 +10,7 @@ import { BrandHeader, COLORS, PrimaryButton, ScreenBackdrop } from './design';
 function FormField({ label, value, onChangeText, ...input }: TextInputProps & { label: string; value: string; onChangeText(value: string): void }) {
   const [focused, setFocused] = useState(false);
   return <View className="mt-5"><Text className="mb-2 text-xs font-semibold text-muted">{label}</Text>
-    <TextInput {...input} value={value} onChangeText={onChangeText} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} placeholderTextColor="#66766E" selectionColor={COLORS.emerald} className={`min-h-14 rounded-2xl border bg-inset px-4 text-base text-ink ${focused ? 'border-pine' : 'border-line'}`} />
+    <TextInput {...input} value={value} onChangeText={onChangeText} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} placeholderTextColor="#7888A1" selectionColor={COLORS.emerald} className={`min-h-14 rounded-2xl border bg-inset px-4 text-base text-ink ${focused ? 'border-pine' : 'border-line'}`} />
   </View>;
 }
 
@@ -56,9 +56,9 @@ export function AuthScreen({ onBackToDemo }: { onBackToDemo?: () => void }) {
         {mode === 'signup' && role === 'recipient' && <>
           <FormField label="Legal name on the bill" placeholder="As printed on the document" value={legalName} onChangeText={setLegalName} autoCapitalize="words" />
           <Text className="mt-6 text-xs font-semibold text-muted">Assistance program · optional</Text>
-          <View className="mt-3 flex-row flex-wrap gap-2">{(['NONE', 'SNAP', 'MEDICAID', 'LIHEAP'] as const).map((program) => <Pressable key={program} accessibilityRole="button" onPress={() => setAssistanceProgram(program)} className={`rounded-full border px-3 py-2 ${assistanceProgram === program ? 'border-pine bg-[#103524]' : 'border-line bg-inset'}`}><Text className={`text-xs font-semibold ${assistanceProgram === program ? 'text-mint' : 'text-muted'}`}>{program === 'NONE' ? 'None' : program}</Text></Pressable>)}</View>
+          <View className="mt-3 flex-row flex-wrap gap-2">{(['NONE', 'SNAP', 'MEDICAID', 'LIHEAP'] as const).map((program) => <Pressable key={program} accessibilityRole="button" onPress={() => setAssistanceProgram(program)} className={`rounded-full border px-3 py-2 ${assistanceProgram === program ? 'border-pine bg-[#182E56]' : 'border-line bg-inset'}`}><Text className={`text-xs font-semibold ${assistanceProgram === program ? 'text-mint' : 'text-muted'}`}>{program === 'NONE' ? 'None' : program}</Text></Pressable>)}</View>
         </>}
-        {error && <View className="mt-5 rounded-xl border border-[#5C1D1D] bg-[#2B0E0E] p-3"><Text className="text-sm text-coral">{error}</Text></View>}
+        {error && <View className="mt-5 rounded-xl border border-[#60283A] bg-[#2B1520] p-3"><Text className="text-sm text-coral">{error}</Text></View>}
         <View className="mt-7"><PrimaryButton label={busy ? 'Please wait…' : mode === 'signin' ? 'Sign in  →' : 'Create account  →'} disabled={busy} onPress={() => void submit()} /></View>
         {busy && <ActivityIndicator className="mt-4" color={COLORS.emerald} />}
         <Pressable accessibilityRole="button" onPress={() => { setMode(mode === 'signin' ? 'signup' : 'signin'); setError(null); }} className="mt-5 min-h-11 justify-center"><Text className="text-center text-sm font-bold text-mint">{mode === 'signin' ? 'New here? Create an account' : 'Already have an account? Sign in'}</Text></Pressable>
